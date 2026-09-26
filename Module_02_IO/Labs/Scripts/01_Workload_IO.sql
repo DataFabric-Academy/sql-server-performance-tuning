@@ -1,5 +1,5 @@
 -- Workload: IO Simulation
- USE AdventureWorks2022;
+ USE AdventureWorks2025;
  GO
  SET STATISTICS IO ON;
  SET STATISTICS TIME ON;

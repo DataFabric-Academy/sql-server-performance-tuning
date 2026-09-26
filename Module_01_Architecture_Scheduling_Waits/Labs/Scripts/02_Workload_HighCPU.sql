@@ -1,7 +1,7 @@
 -- Workload: Simulate High CPU / SOS_SCHEDULER_YIELD
 -- Instructions: Run multiple instances of this script to saturate CPU.
 
-USE AdventureWorks2022;
+USE AdventureWorks2025;
 GO
 
 SET NOCOUNT ON;

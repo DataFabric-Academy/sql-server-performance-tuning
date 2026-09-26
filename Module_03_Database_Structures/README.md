@@ -247,3 +247,27 @@ VLF จำนวนมากเกิดจากการตั้งค่า 
 เพราะทำให้เกิด Index Fragmentation ระดับสูง และสิ้นเปลือง CPU/I/O จากวงจร Shrink-then-Grow
 </details>
 
+
+---
+
+## 8. 🆕 Modernization Notes: SQL Server 2019 → 2025 (อัปเดตตาม Microsoft Learn)
+
+### 8.1 TempDB บน SQL Server 2025
+- **ADR ใน tempdb (ใหม่ใน 2025)** — เปิดได้เพื่อให้ transaction บน temp table/table variable ได้ประโยชน์จาก *Instantaneous rollback* และ *Aggressive log truncation* ลดปัญหา tempdb log เต็ม (ต้อง restart Database Engine หลังเปิด)
+  ```sql
+  ALTER DATABASE tempdb SET ACCELERATED_DATABASE_RECOVERY = ON;  -- 2025, ต้อง restart engine
+  ```
+- **TempDB space resource governance (2025)** — Resource Governor จัดการพื้นที่ tempdb ต่อ workload group ได้ ป้องกัน runaway query กินพื้นที่ tempdb ทั้ง instance (Resource Governor ตอนนี้อยู่ใน **Standard edition** แล้ว)
+- **Memory-optimized tempdb metadata** (แนะนำใน 2019) ยังเป็น opt-in และยังแนะนำให้เปิด — ลด metadata contention บนระบบหลายพัน temp table ต่อวินาที
+- **tmpfs สำหรับ tempdb บน Linux (2025)** — วาง tempdb บน memory filesystem ได้
+
+### 8.2 Transaction Log / VLF
+- ตรวจ VLF ด้วย `sys.dm_db_log_info(file_id)` (แทน `DBCC LOGINFO`) และดูรวมกับ `sys.dm_db_log_space_usage`
+- IFI ตั้งแต่ SQL Server 2022: log autogrow ≤ 64 MB ได้ประโยชน์จาก Instant File Initialization ด้วย
+
+### 8.3 Best Practice ปัจจุบันจาก Microsoft Learn (tempdb)
+1. ใช้ IFI + preallocate ขนาดไฟล์ให้พอกับ workload ปกติ
+2. แบ่งเป็นหลาย data file ขนาด/autogrowth เท่ากัน (เริ่มจำนวน = logical core สูงสุด 8 ไฟล์, เพิ่มทีละกลุ่ม 4 หากยังมี contention — ตามแนวทาง MS ปัจจุบัน)
+3. ตั้ง autogrowth เป็น MB ที่เหมาะสม (เช่น 64–256 MB) ไม่ใช้ PERCENT
+
+> อ้างอิง: [tempdb database](https://learn.microsoft.com/sql/relational-databases/databases/tempdb-database), [ADR in tempdb (2025)](https://learn.microsoft.com/sql/relational-databases/accelerated-database-recovery-concepts), [TempDB space resource governance](https://learn.microsoft.com/sql/relational-databases/resource-governor/tempdb-space-resource-governance)

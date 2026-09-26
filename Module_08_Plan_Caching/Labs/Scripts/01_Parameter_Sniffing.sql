@@ -14,7 +14,7 @@
 -- Lab: Parameter Sniffing Simulation
 -- à¸§à¸±à¸•à¸–à¸¸à¸›à¸£à¸°à¸ªà¸‡à¸„à¹Œ: à¸ˆà¸³à¸¥à¸­à¸‡à¸›à¸±à¸à¸«à¸² Parameter Sniffing à¹à¸¥à¸°à¸à¸²à¸£à¹à¸à¹‰à¹„à¸‚
 
-USE [AdventureWorks2022];
+USE [AdventureWorks2025];
 GO
 
 -- 1. Setup Skewed Data (à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹„à¸¡à¹ˆà¸ªà¸¡à¸”à¸¸à¸¥)

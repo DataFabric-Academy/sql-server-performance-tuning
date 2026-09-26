@@ -19,14 +19,14 @@
         4. Run TASK 4 to fix statistics using FULLSCAN and verify the "Good Plan" returns.
 
     PREREQUISITES:
-        - AdventureWorks2022 or newer
+        - AdventureWorks2025 or newer
 */
 
 -- Lab: Statistics Impact on Query Plans (Modernized)
 -- Adapted from: Lab 07 (Query Execution)
--- Target: AdventureWorks2022/2022
+-- Target: AdventureWorks2025/2022
 
-USE [AdventureWorks2022];
+USE [AdventureWorks2025];
 GO
 
 -- =============================================

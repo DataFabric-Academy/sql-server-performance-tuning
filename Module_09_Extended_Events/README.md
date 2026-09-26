@@ -175,3 +175,19 @@ Lightweight และ Scalable กว่า มีผลกระทบต่อ
 ข้อมูลเก็บใน Memory แบบวงกลม (FIFO) ถ้ามี Event เข้ามาเยอะ ข้อมูลเก่าจะถูกเขียนทับหายไป จึงไม่เหมาะกับการเก็บข้อมูลระยะยาว
 </details>
 
+
+---
+
+## 6. 🆕 Modernization Notes: SQL Server 2019 → 2025
+
+- **Time-bound Extended Event Sessions (ใหม่ใน 2025)** — ตั้งเวลาหยุด session อัตโนมัติ (`AUTO_STOP` / duration option) ป้องกันลืมปิด session จนกิน resource สร้างข้อมูลกองใหญ่:
+  ```sql
+  CREATE EVENT SESSION [XE_Timed] ON SERVER
+  ADD EVENT sqlserver.sql_batch_completed
+  WITH ( AUTO_STOP = ON );   -- 2025: ตั้งเวลา/หยุดเองได้
+  ```
+- SQL Profiler / SQL Trace: **อย่าใช้** — deprecated มายาวนาน และถูกถอดออกจากเครื่องมือหลักแล้ว มาตรฐานปัจจุบันคือ XEvents 100%
+- `ring_buffer` ใช้ดูสด/แก้ปัญหาจุดเดียว แต่ production capture จริงควรใช้ **event_file** + `MAX_FILE_SIZE` + `MAX_DISPATCH_LATENCY` ต่ำ ๆ เพื่อไม่สูญข้อมูลช่วง crash
+- จับ workload overhead ได้ละเอียดกว่าเดิมด้วย event `query_post_execution_plan_profile` (lightweight profiling) แทน `query_post_execution_showplan` ที่แพงกว่ามาก
+
+> อ้างอิง: [Extended Events sessions (2025)](https://learn.microsoft.com/sql/relational-databases/extended-events/sql-server-extended-events-sessions), [Extended Events architecture](https://learn.microsoft.com/sql/relational-databases/extended-events/extended-events)

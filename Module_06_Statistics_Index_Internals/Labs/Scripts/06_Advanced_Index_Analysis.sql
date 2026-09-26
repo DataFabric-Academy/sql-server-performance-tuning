@@ -18,14 +18,14 @@
         4. Run PART 2.2 to find "Unused Indexes" (Seeks=0, Scans=0) that are wasting space/resources.
 
     PREREQUISITES:
-        - AdventureWorks2022 or newer
+        - AdventureWorks2025 or newer
 */
 
 -- Lab: Legacy Migration - Indexing & Statistics Analysis
 -- Adapted from: Lab 06 (Indexing & Statistics)
--- Target: AdventureWorks2022
+-- Target: AdventureWorks2025
 
-USE [AdventureWorks2022]; -- Or AdventureWorks2022
+USE [AdventureWorks2025]; -- Or AdventureWorks2025
 GO
 
 -- =================================================================

@@ -17,13 +17,13 @@
         4. Run TASK 4 in a separate window while running a long query to see real-time blocking/waiting.
 
     PREREQUISITES:
-        - AdventureWorks2022 or newer
+        - AdventureWorks2025 or newer
 */
 
 -- Lab: Analyzing Wait Statistics (Modernized)
 -- Adapted from: Lab 01 (Architecture)
 
-USE [AdventureWorks2022];
+USE [AdventureWorks2025];
 GO
 
 -- =============================================

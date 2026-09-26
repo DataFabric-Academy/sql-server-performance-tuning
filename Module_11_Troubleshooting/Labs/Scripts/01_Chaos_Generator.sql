@@ -1,5 +1,5 @@
 -- Workload: Chaos Generator (Blocking + CPU + IO)
- USE AdventureWorks2022;
+ USE AdventureWorks2025;
  GO
  
  -- 1 in 3 chance of being a Blocker, CPU Hog, or IO Hog

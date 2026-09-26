@@ -207,3 +207,27 @@ sys.dm_exec_requests ใช้ตรวจสอบคำสั่งที่�
 <summary><b>3. ค่า Avg. Disk sec/Read เท่าไหร่ถือว่าเริ่มมีปัญหา?</b></summary>
 มากกว่า 20ms เริ่มมีปัญหาคอขวด (Potential Bottleneck) และควรตรวจสอบ Storage Subsystem
 </details>
+
+---
+
+## 7. 🆕 Modernization Notes: SQL Server 2019 → 2025
+
+### 7.1 ชุดเครื่องมือปัจจุบัน
+- **Glenn Berry — SQL Server 2025 Diagnostic Queries** คือ baseline suite มาตรฐาน (ดาวน์โหลดจาก [glennsqlperformance.com/resources](https://glennsqlperformance.com/resources/)) — รันทั้งชุดแล้วเก็บผลเป็นไฟล์/spreadsheet เทียบเดือนต่อเดือน
+- บทบาท server ใหม่ (SQL Server 2022+) `##MS_ServerPerformanceStateReader##` ให้สิทธิ์อ่าน DMV ด้าน performance โดยไม่ต้อง sysadmin — ใช้กับ monitoring account เสมอ
+- **Query Store** คือ baseline ที่ดีที่สุดระดับ query (ต่อเวลา อัตโนมัติ) — ใช้คู่กับ wait stats ระดับ instance
+- dbatools (PowerShell): `Test-DbaLastBackup`, `Get-DbaWaitStatistic`, `Invoke-DbaDbDbccCheckTable` ฯลฯ สำหรับ automation
+
+### 7.2 Key Metrics ที่ยังใช้ได้ (และข้อควรระวัง)
+| Metric | แหล่ง | ข้อควรระวัง |
+|:-------|:------|:-----------|
+| Wait stats (top, per interval) | `sys.dm_os_wait_stats` | ค่าสะสม — เก็บ delta เทียบ snapshot |
+| CPU % / Scheduler queue | PerfMon `% Processor Time`, `sys.dm_os_schedulers` | ดู signal wait คู่กัน |
+| Page life expectancy | PerfMon Buffer Node | อย่าใช้ 300s เดิม — ดู trend ต่อ NUMA |
+| File I/O latency | `sys.dm_io_virtual_file_stats` | ค่าเฉลี่ยสะสม — snapshot เทียบ |
+| Long-running / regressed query | Query Store | เปิด READ_WRITE ทุก production DB |
+
+### 7.3 Alerting Threshold ตัวอย่างที่แนะนำตอนเริ่ม
+- CPU > 80% นาน > 15 นาที · `SIGNAL_WAIT%` > 10% ต่อเนื่อง · log file latency > 5 ms · tempdb growth > 80% · lock waits > 5,000 ms บ่อย ๆ · Query Store regressed query ใหม่
+
+> อ้างอิง: [Performance Monitoring and Tuning Tools](https://learn.microsoft.com/sql/relational-databases/performance/performance-monitoring-and-tuning-tools), [dbatools](https://dbatools.io/)

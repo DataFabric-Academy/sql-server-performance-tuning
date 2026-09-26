@@ -9,7 +9,7 @@
 **คอร์ส SQL Server Performance Tuning ฉบับภาษาไทย**  
 *เนื้อหาถูกเรียบเรียงมาจาก Microsoft Course 10987C โดยมีการปรับปรุงเนื้อหาและสคริปต์ให้ทันสมัย*
 
-[📖 เริ่มต้นใช้งาน](#-การใช้งาน) • [📚 โครงสร้างบทเรียน](#-โครงสร้างบทเรียน-course-structure) • [🤝 Credits](#-credits)
+[📖 เริ่มต้นใช้งาน](#-การใช้งาน) • [📚 โครงสร้างบทเรียน](#-โครงสร้างบทเรียน-course-structure) • [🗓️ ตารางอบรม 4 วัน](Trainer_Docs/Course_Guide_4Days.md) • [🤝 Credits](#-credits)
 
 </div>
 
@@ -19,13 +19,15 @@
 
 คอร์สนี้ครอบคลุมการปรับปรุงประสิทธิภาพ SQL Server ตั้งแต่พื้นฐานสถาปัตยกรรมไปจนถึงเทคนิคขั้นสูง โดยเน้นการใช้งาน Dynamic Management Views (DMVs), Extended Events, และเครื่องมือวินิจฉัยสมัยใหม่
 
+> **การจัดอบรมโดย Trainocate**: หลักสูตร 4 วัน (24 ชั่วโมง) ตาม Outline อย่างเป็นทางการ — ดูตารางเวลารายวัน, วัตถุประสงค์ และแผนการสอนฉบับเต็มได้ที่ **[Trainer_Docs/Course_Guide_4Days.md](Trainer_Docs/Course_Guide_4Days.md)**
+
 ### ✨ คุณสมบัติหลัก
 
-- ✅ **11 Modules** ครอบคลุมทุกด้านของ Performance Tuning
-- ✅ **Modern Scripts** อัปเดตตาม SQL Server 2025 Diagnostic Queries
-- ✅ **Hands-on Labs** พร้อมแบบฝึกหัดจริง
+- ✅ **11 Modules** ตรงตาม Outline หลักสูตร (บทที่ 1–11) ครอบคลุมทุกด้านของ Performance Tuning
+- ✅ **Modern Scripts** อัปเดตตาม SQL Server 2025 — Optimized Locking, IQP รุ่นใหม่ (OPPO, CE Feedback), Query Store ล่าสุด, TempDB ADR/Governance
+- ✅ **Hands-on Labs** รูปแบบ *Instruction + Code block* — ทุก Step รันได้ทันทีจากเอกสารเดียว
 - ✅ **Workload Scripts** สำหรับทดสอบและสาธิต
-- ✅ **Best Practices** จาก Microsoft และ SQL Server Experts
+- ✅ **Best Practices** จาก Microsoft Learn, Course 10987C และ Glenn Berry Diagnostic Queries (SQL Server 2025)
 
 ---
 
@@ -44,6 +46,17 @@
 | **[09](./Module_09_Extended_Events/README.md)** | Extended Events | การใช้งาน XEvents แทน Profiler | ⭐⭐⭐ |
 | **[10](./Module_10_Monitoring_Tracing/README.md)** | Monitoring and Baselines | การทำ Performance Baseline ด้วย PerfMon | ⭐⭐⭐ |
 | **[11](./Module_11_Troubleshooting/README.md)** | Troubleshooting | สรุปแนวทางการวิเคราะห์ปัญหา | ⭐⭐⭐⭐⭐ |
+
+### 🗓️ ผังการอบรม 4 วัน (24 ชั่วโมง)
+
+| วัน | หัวข้อ | บทที่ |
+|:---:|:-------|:------|
+| **วันที่ 1** | Architecture & I/O Foundation | 1–3 |
+| **วันที่ 2** | Memory, Concurrency & Index | 4–6 |
+| **วันที่ 3** | Query Processing & Plan Management | 7–9 |
+| **วันที่ 4** | Monitoring, Tuning Strategy & Troubleshooting | 10–11 + Case Study |
+
+> ตารางเวลาละเอียดรายชั่วโมง → [Trainer_Docs/Course_Guide_4Days.md](Trainer_Docs/Course_Guide_4Days.md)
 
 ---
 
@@ -67,10 +80,10 @@ Module_XX_Topic/
 
 | ข้อกำหนด | รายละเอียด |
 |:--------|:----------|
-| **SQL Server** | 2022 (แนะนำ) หรือ 2019 ขึ้นไป |
-| **Database** | AdventureWorks2022 |
+| **SQL Server** | 2025 (แนะนำ) หรือ 2019/2022 — ฟีเจอร์เฉพาะรุ่นมีหมายเหตุกำกับ |
+| **Database** | **AdventureWorks2025** (แนะนำ) — บน SQL Server 2019/2022 ใช้ AdventureWorks2022 |
 | **Permissions** | `VIEW SERVER STATE`, `VIEW DATABASE STATE` |
-| **Tools** | SQL Server Management Studio (SSMS) 18.0+ |
+| **Tools** | SSMS 20/21, DiskSpd, Query Store, Extended Events |
 
 ### ขั้นตอนการเริ่มต้น
 
@@ -81,7 +94,7 @@ Module_XX_Topic/
    ```
 
 2. **Setup Database**
-   - ดาวน์โหลดและติดตั้ง [AdventureWorks2022](https://github.com/Microsoft/sql-server-samples/releases/tag/adventureworks)
+   - ดาวน์โหลด [AdventureWorks2025.bak](https://github.com/Microsoft/sql-server-samples/releases/download/adventureworks/AdventureWorks2025.bak) แล้ว Restore (วิธีทำจาก [Microsoft Learn](https://learn.microsoft.com/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms)) — หากใช้ SQL Server 2019/2022 ให้ใช้ AdventureWorks2022.bak และแก้ชื่อ DB ในสคริปต์
    - Restore database ลงใน SQL Server instance ของคุณ
 
 3. **Verify Setup**

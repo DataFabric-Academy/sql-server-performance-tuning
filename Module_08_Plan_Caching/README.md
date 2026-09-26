@@ -271,3 +271,22 @@ graph LR
 เพราะการล้าง Cache จะทำให้ CPU Spike เนื่องจากต้อง Compile Query ใหม่ทั้งหมด (Compilation Storm) และเสีย Disk I/O เพื่ออ่าน Metadata ใหม่
 </details>
 
+
+---
+
+## 7. 🆕 Modernization Notes: SQL Server 2019 → 2025
+
+### 7.1 Plan Cache
+- **Optimized sp_executesql (ใหม่ใน 2025)** — ทำให้ batch ที่ส่งผ่าน `sp_executesql` เข้าสู่กระบวนการ compile แบบ serialize เหมือน stored procedure ช่วยลด **compilation storms** (โหลด compile พร้อมกันจำนวนมาก เช่น หลัง failover หรือ cache flush) — เปิดผ่าน sp_configure หรือ database scoped configuration
+- ยังใช้เกณฑ์เดิม: ดู plan cache bloat ด้วย `sys.dm_os_memory_cache_counters` (CacheType `SQL Plans` vs `Object Plans`), SINGLE_USE vs MULTI_USE plans
+
+### 7.2 Query Store ล่าสุด
+- **Query Store สำหรับ readable secondary เปิด default ใน 2025** — วิเคราะห์ workload ฝั่ง AG secondary ได้เลย
+- **Query Store Hints (2022+)** + **`ABORT_QUERY_EXECUTION` hint (ใหม่ใน 2025)**: บล็อก query ที่รู้ว่ามีปัญหา (เช่น ad-hoc หนักจาก app) ได้โดยไม่ต้องแก้โค้ด
+- Automatic Plan Correction: `ALTER DATABASE ... SET AUTOMATIC_TUNING (FORCE_LAST_GOOD_PLAN = ON);`
+
+### 7.3 แนวทางปฏิบัติ
+- ตรวจ regressed plan ตาม `avg_duration`/`avg_cpu_time` ต่อช่วงเวลา (ทำใน Lab 8)
+- Force Plan ใช้เป็น **ยาฉุกเฉิน** พร้อมวางแผนแก้ query/index ที่ต้นเหตุต่อ
+
+> อ้างอิง: [Query Store hints](https://learn.microsoft.com/sql/relational-databases/performance/query-store-hints-best-practices), [Optimized sp_executesql](https://learn.microsoft.com/sql/relational-databases/system-stored-procedures/sp-executesql-transact-sql), [Automatic tuning](https://learn.microsoft.com/sql/relational-databases/automatic-tuning/automatic-tuning)

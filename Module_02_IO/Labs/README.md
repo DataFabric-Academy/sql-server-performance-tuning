@@ -1,71 +1,183 @@
-# Lab: การวิเคราะห์ I/O Performance
+# Lab 2: DiskSpd Benchmark & I/O Latency Analysis (บทที่ 2)
 
-## Prerequisites (สิ่งที่ต้องเตรียม)
-- **Database**: `AdventureWorks2022`
-- **Permissions**: `sysadmin` (เพื่อใช้คำสั่ง `DBCC DROPCLEANBUFFERS`)
+> **ที่มา**: ปรับปรุงจาก Microsoft 10987C **Lab02** (DiskSpd) + [Microsoft Learn — sys.dm_io_virtual_file_stats](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-io-virtual-file-stats-transact-sql) + [Glenn Berry — SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
+> รูปแบบ: **Instruction + Code block** — ทุก Step รันได้ทันที (DiskSpd bundled อยู่ที่ `Trainer_Docs/10987/Labfiles/Lab02/Diskspd-v2.0.15/amd64fre/diskspd.exe`)
 
-## Scenario (สถานการณ์)
-ผู้ใช้งานแจ้งว่า "รายงานทำงานช้ามาก" คุณสงสัยว่าระบบ Storage อาจจะเป็นคอขวด (Bottleneck) หรือ Query อาจจะมีการอ่านข้อมูลจาก Disk มากเกินไป (Physical Reads)
+## Prerequisites
 
-## Objectives (วัตถุประสงค์)
-1.  ใช้ `SET STATISTICS IO` เพื่อวัดค่า Logical Reads
-2.  ใช้ `DBCC DROPCLEANBUFFERS` เพื่อบังคับให้เกิด Physical Reads (ล้าง Cache)
-3.  วิเคราะห์ Disk Latency ผ่านทาง DMVs
+- SQL Server 2019+ (แนะนำ **2025 (17.x)**), database **AdventureWorks2025**
+- **DiskSpd.exe** (ดาวน์โหลดจาก [github.com/microsoft/diskspd](https://github.com/microsoft/diskspd) หรือใช้ตัวใน 10987 Lab02)
+- Command Prompt / PowerShell แบบ Administrator
+- Permission: `VIEW SERVER STATE`, `sysadmin` (สำหรับ `DBCC DROPCLEANBUFFERS`)
 
----
+## Scenario
 
-## Exercise 1: การวัดค่า I/O (Logical vs Physical)
+Adventure Works จะติดตั้ง server ใหม่ให้ Proseware Inc. ซึ่งมี workload เขียน transaction log หนัก คุณต้องพิสูจน์ว่า storage ผ่านเกณฑ์ และหาไฟล์ใดใน instance ปัจจุบันที่ latency แย่ที่สุด
 
-### Step 1: วิเคราะห์ Logical Reads (Cold Cache vs Warm Cache)
-1.  เปิดไฟล์ `Scripts\01_Workload_IO.sql`
-2.  เปิดโหมด "Include Actual Execution Plan" (Ctrl+M)
-3.  รัน Script ส่วน **Step 1 (Cold Cache)**:
-    *   คำสั่งนี้จะบังคับให้ SQL อ่านข้อมูลจาก Disk จริงๆ (Physical Read)
-    *   สังเกตที่แท็บ "Messages" จะเห็นยอด `Physical reads` สูง
-4.  รัน Script ส่วน **Step 2 (Warm Cache)**:
-    *   คำสั่งนี้จะอ่านข้อมูลจาก Buffer Pool (Memory)
-    *   สังเกตว่า `Physical reads` จะกลายเป็น 0 แต่ `Logical reads` ยังคงสูงเท่าเดิม
+## Objectives
 
-### Step 2: เปรียบเทียบ Scan vs Seek
-1.  รัน Script ส่วน **Step 3 (Index Seek)**
-2.  เปรียบเทียบค่า `Logical reads` กับแบบ Scan ก่อนหน้า
-    *   **Scan**: Logical Reads สูงมาก (เพราะต้องอ่านทุกหน้า)
-    *   **Seek**: Logical Reads ต่ำ (เพราะวิ่งผ่าน B-Tree ไปหาข้อมูลเลย)
+1. วัด I/O (Logical vs Physical) ด้วย `SET STATISTICS IO`
+2. ทดสอบ storage ด้วย DiskSpd แบบ random (OLTP) และ sequential (log/bulk)
+3. วิเคราะห์ I/O จริงต่อไฟล์ด้วย `sys.dm_io_virtual_file_stats`
 
 ---
 
-## Exercise 2: การ Monitor Virtual File Stats
+## Exercise 1: วัด Logical vs Physical Reads ใน SQL Server
 
-1.  ในขณะที่รัน IO Workload (อาจจะรันวนลูปทิ้งไว้), ให้ตรวจสอบค่า Latency ของไฟล์:
-    ```sql
-    SELECT 
-        DB_NAME(vfs.database_id) AS DBName,
-        mf.name AS FileName,
-        io_stall_read_ms / NULLIF(num_of_reads, 0) AS AvgReadLatency_ms,
-        io_stall_write_ms / NULLIF(num_of_writes, 0) AS AvgWriteLatency_ms
-    FROM sys.dm_io_virtual_file_stats(NULL, NULL) vfs
-    JOIN sys.master_files mf ON vfs.database_id = mf.database_id AND vfs.file_id = mf.file_id
-    WHERE vfs.database_id = DB_ID('AdventureWorks2022')
-    ORDER BY AvgReadLatency_ms DESC;
-    ```
-2.  **เกณฑ์วัดผล (Benchmark)**:
-    *   < 5ms: ดีมาก (Excellent)
-    *   10-20ms: พอใช้ (Acceptable)
-    *   > 20ms: เริ่มมีปัญหาคอขวด (Potential Bottleneck)
+### Step 1 — เปิดโหมดวัดผล I/O และ Execution Plan
+
+```sql
+USE AdventureWorks2025;
+GO
+SET STATISTICS IO, TIME ON;
+```
+
+### Step 2 — Cold cache: บังคับอ่านจาก disk (⚠️ VM ทดสอบเท่านั้น)
+
+```sql
+CHECKPOINT;
+DBCC DROPCLEANBUFFERS;  -- ห้ามรันบน Production
+GO
+SELECT COUNT(*) FROM Sales.SalesOrderDetail;
+GO
+```
+
+✅ **สังเกต** แท็บ Messages: `physical reads` สูง, `logical reads` เท่าเดิมทุกครั้ง
+
+### Step 3 — Warm cache: รันซ้ำเพื่ออ่านจาก memory
+
+```sql
+SELECT COUNT(*) FROM Sales.SalesOrderDetail;
+GO
+```
+
+✅ **สังเกต**: `physical reads = 0` แต่ `logical reads` เท่าเดิม — logical reads คือตัวชี้วัดงานของ query ไม่ใช่ disk
 
 ---
 
-## Exercise 3: Advanced - การวิเคราะห์ Latency ระดับ Drive
-*แบบฝึกหัดขั้นสูงนี้จะใช้ `02_Drive_Latency.sql` เพื่อดูภาพรวมสุขภาพของ Storage Subsystem*
+## Exercise 2: ทดสอบ Storage ด้วย DiskSpd (Command Prompt)
 
-### Concept (แนวคิด)
-ในขณะที่ `sys.dm_io_virtual_file_stats` บอกค่า Latency รายไฟล์ แต่บางครั้งคอขวดอาจจะอยู่ที่ตัว **Physical Drive** เอง (ซึ่งแชร์กันหลายไฟล์ หรือหลาย Database)
+### Step 1 — สร้างไฟล์ทดสอบ 2 GB
 
-### Steps (ขั้นตอน)
-1.  เปิดและรัน: `Scripts\02_Drive_Latency.sql`
-2.  วิเคราะห์คอลัมน์ต่างๆ:
-    *   **Read/Write Latency**: แยกค่า Latency ของการอ่านและเขียน เพื่อดูว่าช้าที่ฝั่งไหน
-    *   **Overall Latency**: ค่าเฉลี่ยรวม
-    *   **Avg Bytes/Transfer**: บอกขนาดของ I/O Size โดยเฉลี่ย
-        *   ถ้าค่าสูง (เช่น 64KB+) มักเกิดจากกิจกรรมอย่าง Table Scan หรือ Backup
-        *   ถ้าค่าต่ำ (8KB) มักเกิดจากกิจกรรม OLTP (Index Seek, Key Lookup)
+```bat
+fsutil file createnew D:\Temp\sqltest.dat 2147483648
+```
+
+> เปลี่ยน `D:\Temp` เป็น drive ที่ต้องการวัด (ควรเป็น drive เดียวกับ data/log จริง)
+
+### Step 2 — Random Read/Write 8KB (จำลอง OLTP)
+
+```bat
+diskspd -c2G -d60 -r -w30 -t2 -o8 -b8K -Sh -h D:\Temp\sqltest.dat
+```
+
+| ตัวเลือก | ความหมาย |
+|:---------|:---------|
+| `-c2G` | สร้างไฟล์ทดสอบ 2 GB |
+| `-d60` | ทดสอบ 60 วินาที |
+| `-r` | Random access |
+| `-w30` | Write 30% / Read 70% |
+| `-t2` / `-o8` | 2 threads / queue depth 8 |
+| `-b8K` | Block size 8 KB (ขนาด page ของ SQL Server) |
+| `-Sh` | ปิด software + hardware caching (วัดของจริง) |
+
+### Step 3 — Sequential Write 64KB (จำลอง log write / bulk load)
+
+```bat
+diskspd -c2G -d60 -s -w100 -t1 -o8 -b64K -Sh -h D:\Temp\sqltest.dat
+```
+
+✅ **เกณฑ์ตีความผลลัพธ์**:
+
+| ตัววัด | ผ่านเกณฑ์ |
+|:-------|:----------|
+| 8K random IOPS | > 5,000 (SSD ปกติ) |
+| avg latency (OLTP) | < 5–10 ms |
+| avg latency (log write) | < 5 ms |
+| 64K sequential MB/s | สูงกว่า random หลายเท่า |
+
+---
+
+## Exercise 3: วิเคราะห์ I/O จริงต่อไฟล์ (SSMS)
+
+### Step 1 — เก็บสถิติ latency ต่อไฟล์ทั้ง instance (สไตล์ Glenn Berry)
+
+```sql
+SELECT DB_NAME(vfs.database_id) AS database_name,
+       mf.name AS logical_file_name,
+       mf.type_desc,                       -- ROWS = data, LOG = log
+       vfs.num_of_reads, vfs.num_of_writes,
+       vfs.io_stall_read_ms  / NULLIF(vfs.num_of_reads, 0)  * 1.0 AS avg_read_latency_ms,
+       vfs.io_stall_write_ms / NULLIF(vfs.num_of_writes, 0) * 1.0 AS avg_write_latency_ms,
+       vfs.io_stall_read_ms + vfs.io_stall_write_ms AS total_io_stall_ms,
+       (vfs.io_stall_read_ms + vfs.io_stall_write_ms)
+           / NULLIF(vfs.num_of_reads + vfs.num_of_writes, 0) * 1.0 AS avg_io_latency_ms
+FROM sys.dm_io_virtual_file_stats(NULL, NULL) AS vfs
+JOIN sys.master_files AS mf
+    ON vfs.database_id = mf.database_id AND vfs.file_id = mf.file_id
+ORDER BY avg_io_latency_ms DESC;
+```
+
+### Step 2 — สร้างโหลดจริงเขียนลง log (รันทิ้งไว้ ~1 นาที)
+
+```sql
+USE AdventureWorks2025;
+GO
+DECLARE @i INT = 0;
+WHILE @i < 200
+BEGIN
+    UPDATE TOP (100) Sales.SalesOrderDetail
+    SET ModifiedDate = DATEADD(MINUTE, @i, OrderDate)
+    WHERE SalesOrderDetailID % 500 = (@i % 500);
+    SET @i += 1;
+END
+```
+
+### Step 3 — เฝ้า latency ของไฟล์ database นี้ระหว่างโหลด (รันซ้ำ 3–4 ครั้ง)
+
+```sql
+SELECT mf.type_desc,
+       vfs.num_of_writes,
+       vfs.io_stall_write_ms / NULLIF(vfs.num_of_writes, 0) * 1.0 AS avg_write_latency_ms,
+       vfs.io_stall_read_ms / NULLIF(vfs.num_of_reads, 0) * 1.0 AS avg_read_latency_ms
+FROM sys.dm_io_virtual_file_stats(DB_ID('AdventureWorks2025'), NULL) AS vfs
+JOIN sys.master_files AS mf
+    ON vfs.database_id = mf.database_id AND vfs.file_id = mf.file_id;
+```
+
+✅ **สังเกต**: ค่าเป็นค่าเฉลี่ย **สะสมตั้งแต่ startup** — ถ้าจะดูรายช่วง ให้เก็บ snapshot เทียบกัน (จะได้ทำต่อใน Lab 10)
+
+### Step 4 (ขั้นสูง) — รวม latency ระดับ drive เพื่อหา drive ที่มีปัญหา
+
+```sql
+SELECT UPPER(LEFT(mf.physical_name, 3)) AS drive,
+       SUM(vfs.num_of_reads + vfs.num_of_writes) AS total_ios,
+       SUM(vfs.io_stall_read_ms + vfs.io_stall_write_ms)
+           / NULLIF(SUM(vfs.num_of_reads + vfs.num_of_writes), 0) * 1.0 AS avg_latency_ms
+FROM sys.dm_io_virtual_file_stats(NULL, NULL) AS vfs
+JOIN sys.master_files AS mf
+    ON vfs.database_id = mf.database_id AND vfs.file_id = mf.file_id
+GROUP BY UPPER(LEFT(mf.physical_name, 3))
+ORDER BY avg_latency_ms DESC;
+```
+
+---
+
+## Wrap-up: คำถามท้ายแล็บ
+
+1. DiskSpd ได้ IOPS/latency เท่าไร และเพียงพอกับ workload OLTP ที่คาดการณ์หรือไม่?
+2. ไฟล์ใดมี latency แย่สุด เป็น data หรือ log? จะเริ่มแก้จากตรงไหน?
+3. ทำไมต้องใส่ `-Sh` ปิด cache ตอนทดสอบ? (วัดของจริงที่ SQL Server จะได้รับ ไม่ใช่ของ disk cache)
+
+## Cleanup
+
+```bat
+del D:\Temp\sqltest.dat
+```
+
+## แหล่งอ้างอิง
+
+- 10987C Lab02 — `Trainer_Docs/10987/Labfiles/Lab02/`
+- Microsoft Learn: [sys.dm_io_virtual_file_stats](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-io-virtual-file-stats-transact-sql) · [ZSTD backup compression (2025)](https://learn.microsoft.com/sql/relational-databases/backup-restore/backup-compression-sql-server)
+- Glenn Berry: [SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
+- สคริปต์เสริมในโมดูล: `Scripts/01_Virtual_File_Stats.sql`, `Labs/Scripts/03_Diskspd_Stress_Test.sql`

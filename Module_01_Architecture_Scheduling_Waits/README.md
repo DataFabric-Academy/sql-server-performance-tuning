@@ -282,3 +282,25 @@ Resource Wait คือรอของ (เช่น Disk/Lock) แต่ Signal
 Thread หยุดทำงานเพราะต้องรอทรัพยากรบางอย่าง (เช่น รออ่านข้อมูลจาก Disk หรือรอปลด Lock)
 </details>
 
+
+---
+
+## 7. 🆕 Modernization Notes: SQL Server 2019 → 2025 (อัปเดตตาม Microsoft Learn)
+
+### 7.1 Scheduling — สิ่งที่เปลี่ยนใน SQL Server 2025
+- **`lightweight pooling` (fiber mode) ถูกประกาศ deprecated ใน SQL Server 2025** และจะถูกถอดออกในรุ่นถัดไป — โมเดล Cooperative/Non-Preemptive Scheduling บน Worker Thread คือทางเดียวที่ Microsoft สนับสนุน อย่าเสียเวลาตั้งค่านี้บน production อีกต่อไป
+- **Hot Add CPU ถูก deprecated เช่นกัน** — วางแผนขนาด CPU ตั้งแต่ต้น (แนะนำใช้ Glenn Berry's diagnostic query "CPU/NUMA" เพื่อบันทึก topology ตั้งแต่วันแรกของระบบ)
+- Soft-NUMA ถูกสร้างอัตโนมัติตั้งแต่ SQL Server 2016+ เมื่อจำนวน logical core ต่อ NUMA node เกิน 8 — ตรวจสอบผลกระทบด้วย `sys.dm_os_nodes` (`node_state_desc` จะระบุ `ONLINE AUTOMATIC`)
+
+### 7.2 Waits — เทคนิคปัจจุบัน
+- ยังใช้ **Waits & Queues methodology** เป็นแกนหลัก (Resource Waits + Signal Waits) — Signal Wait Ratio > 10–15% ต่อเนื่อง = CPU pressure
+- ตั้งแต่ SQL Server 2019+ ใช้ `sys.dm_exec_query_plan_stats` (เปิดด้วย `last_query_plan_stats = 1`) เพื่อดึง **Last Actual Plan** ได้จาก `sys.dm_exec_query_stats` โดยไม่ต้องพึ่ง Query Store เสมอ
+- ตีความ `CXPACKET` ร่วมกับ `CXCONSUMER`: ถ้า `CXCONSUMER` สูงตามหลัง มักเป็นพฤติกรรมปกติของ parallel plan; ให้โฟกัสที่ ratio ของ `CXPACKET` เทียบกับ wait รวม
+- SQL Server 2025 บน Linux ใช้โมเดล SQLOS เดียวกัน — wait types และ DMVs ทั้งหมดใช้ได้เหมือนกัน
+
+### 7.3 สิ่งที่ควรทำใหม่เมื่อขึ้น SQL Server 2025
+1. เก็บ **Scheduler/NUMA baseline** ด้วย [Glenn Berry — SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/) (หมวด Instance Level)
+2. ใช้บทบาทใหม่ `##MS_ServerPerformanceStateReader##` (แนะนำตั้งแต่ SQL Server 2022) ให้สิทธิ์อ่าน DMV แทนการยกระดับเป็น sysadmin
+3. ตรวจ `max_worker_percent` / `max_workers_count` ใน `sys.dm_os_sys_info` — Workload ยุคใหม่ (หลาย connection เล็ก ๆ จาก API/microservices) ทำให้ Worker exhaustion พบบ่อยขึ้น
+
+> อ้างอิง: [Thread and Task Architecture Guide](https://learn.microsoft.com/sql/relational-databases/thread-and-task-architecture-guide), [What's new in SQL Server 2025](https://learn.microsoft.com/sql/sql-server/what-s-new-in-sql-server-2025)

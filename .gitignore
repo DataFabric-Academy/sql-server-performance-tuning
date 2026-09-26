@@ -63,6 +63,8 @@ obj/
 # ============================================
 # Documentation (if generated)
 # ============================================
+Trainer_Docs/*
+!Trainer_Docs/Course_Guide_4Days.md
 docs/_build/
 *.docx
 *.doc

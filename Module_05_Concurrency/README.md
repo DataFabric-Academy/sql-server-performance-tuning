@@ -420,3 +420,33 @@ Read Committed (แบบ Pessimistic ซึ่งใช้ Shared Lock ใน�
 จัดลำดับการเข้าถึงตารางให้เหมือนกันในทุก Transaction (Access Objects in Order) เพื่อไม่ให้เกิดวงจรอุบาทว์ (Cycle)
 </details>
 
+
+---
+
+## 8. 🆕 Modernization Notes: SQL Server 2019 → 2025 (อัปเดตตาม Microsoft Learn)
+
+### 8.1 Optimized Locking (ฟีเจอร์ใหม่ใน SQL Server 2025)
+- **TID Locking**: เมื่อเปิดใช้ จะไม่ถือ row/page locks จนจบ transaction ใน READ COMMITTED — เหลือ lock เดียวคือ **Transaction ID (TID) lock** ลด lock memory และโอกาส lock escalation มาก
+- **Lock After Qualification (LAQ)**: ตรวจ predicate บน row เวอร์ชันล่าสุดที่ committed **โดยไม่ต้องกุม U lock** ทำให้ concurrency ดีขึ้น (ทำงานเมื่อเปิด RCSI)
+- สถานะ: **ปิด default ใน SQL Server 2025** (ต่างจาก Azure SQL DB ที่เปิดให้ DB ใหม่) — เปิดด้วย:
+  ```sql
+  -- ต้องเปิด ADR ก่อน และแนะนำเปิด RCSI คู่กัน
+  ALTER DATABASE [AdventureWorks2025] SET ACCELERATED_DATABASE_RECOVERY = ON;
+  ALTER DATABASE [AdventureWorks2025] SET OPTIMIZED_LOCKING = ON;  -- ต้องไม่มี connection อื่นตอนรัน
+  ```
+- ตรวจสอบสถานะ:
+  ```sql
+  SELECT name, is_accelerated_database_recovery_on,
+         is_read_committed_snapshot_on, is_optimized_locking_on
+  FROM sys.databases;
+  ```
+
+### 8.2 Accelerated Database Recovery (ADR) ล่าสุด
+- 2025 เพิ่ม **ADR ใน tempdb** — rollback temp table/table variable ทันที และ truncate tempdb log อย่างรุนแรงขึ้น (ต้อง restart engine)
+- ระวัง: ADR ทำให้ Persistent Version Store เติบโต — มอนิเตอร์ `sys.dm_tran_persistent_version_store_stats`
+
+### 8.3 แนวทางวินิจฉัยปี 2025
+- ตรวจ blocking ด้วย `sys.dm_exec_requests` + `blocked_process_report` (XEvents) เหมือนเดิม แต่ถ้าเปิด Optimized Locking จะสังเกตได้ว่า LCK_M_* waits ลดลงมากสำหรับ OLTP ปกติ — ปัญหาที่เหลือมักเป็น long-running write transaction จริง ๆ
+- SQL Profiler อย่าใช้ — จับ deadlock ด้วย XEvent `xml_deadlock_report` เสมอ (ดู Lab 9)
+
+> อ้างอิง: [Optimized locking](https://learn.microsoft.com/sql/relational-databases/performance/optimized-locking), [Transaction locking and row versioning guide](https://learn.microsoft.com/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide), [ADR](https://learn.microsoft.com/sql/relational-databases/accelerated-database-recovery-concepts)

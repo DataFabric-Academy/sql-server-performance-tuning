@@ -21,7 +21,7 @@
         5. (Optional) Stop the session when finished.
 
     PREREQUISITES:
-        - AdventureWorks2022 or newer
+        - AdventureWorks2025 or newer
 */
 
 -- Lab: Tracking Page Splits with Extended Events (Modernized)
@@ -44,7 +44,7 @@ GO
 CREATE EVENT SESSION [CapturePageSplits] ON SERVER 
 ADD EVENT sqlserver.page_split(
     ACTION(sqlserver.database_name, sqlserver.sql_text, sqlserver.client_app_name)
-    WHERE ([sqlserver].[database_name]=N'AdventureWorks2022') -- filter target DB
+    WHERE ([sqlserver].[database_name]=N'AdventureWorks2025') -- filter target DB
 )
 ADD TARGET package0.ring_buffer(SET max_events_limit=(1000))
 WITH (MAX_MEMORY=4096 KB, EVENT_RETENTION_MODE=ALLOW_SINGLE_EVENT_LOSS, MAX_DISPATCH_LATENCY=5 SECONDS);
@@ -60,7 +60,7 @@ GO
 -- =============================================
 -- TASK 3: GENERATE PAGE SPLITS (Simulation)
 -- =============================================
-USE [AdventureWorks2022];
+USE [AdventureWorks2025];
 GO
 IF OBJECT_ID('dbo.PageSplitDemo') IS NOT NULL DROP TABLE dbo.PageSplitDemo;
 CREATE TABLE dbo.PageSplitDemo (

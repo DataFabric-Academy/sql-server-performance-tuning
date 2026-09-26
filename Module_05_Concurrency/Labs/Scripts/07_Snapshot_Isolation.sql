@@ -20,14 +20,14 @@
         6. Commit/Rollback Window 2 when finished.
 
     PREREQUISITES:
-        - AdventureWorks2022 or newer
+        - AdventureWorks2025 or newer
 */
 
 -- Lab: Legacy Migration - Snapshot Isolation & Locking
 -- Adapted from: Lab 05 (Concurrency)
--- Target: AdventureWorks2022 (Using internal setup, no external scripts)
+-- Target: AdventureWorks2025 (Using internal setup, no external scripts)
 
-USE [AdventureWorks2022]; -- Or AdventureWorks2022
+USE [AdventureWorks2025]; -- Or AdventureWorks2025
 GO
 
 -- =================================================================
@@ -58,7 +58,7 @@ GO
 -- =================================================================
 -- à¸„à¸³à¹à¸™à¸°à¸™à¸³: à¹€à¸›à¸´à¸”à¸«à¸™à¹‰à¸²à¸•à¹ˆà¸²à¸‡ New Query à¸­à¸µà¸à¸«à¸™à¹‰à¸²à¸•à¹ˆà¸²à¸‡à¸«à¸™à¸¶à¹ˆà¸‡ (Window 2) à¹à¸¥à¹‰à¸§à¸£à¸±à¸™à¸„à¸³à¸ªà¸±à¹ˆà¸‡à¸™à¸µà¹‰:
 /*
-    USE [AdventureWorks2022];
+    USE [AdventureWorks2025];
     BEGIN TRAN
         -- à¸–à¸·à¸­ Lock à¸™à¸²à¸™ 10 à¸§à¸´à¸™à¸²à¸—à¸µ
         UPDATE Proseware.Campaign SET CampaignName = 'LockTest' WHERE CampaignTerritoryID = 1;
@@ -80,7 +80,7 @@ WHERE resource_database_id = DB_ID();
 
 -- 3.2 Enable Snapshot Isolation
 -- (Warning: This might block if there are active connections)
-ALTER DATABASE [AdventureWorks2022] SET ALLOW_SNAPSHOT_ISOLATION ON;
+ALTER DATABASE [AdventureWorks2025] SET ALLOW_SNAPSHOT_ISOLATION ON;
 PRINT 'Snapshot Isolation Enabled.';
 
 -- 3.3 Test Snapshot Isolation
@@ -94,6 +94,6 @@ BEGIN TRAN
 COMMIT
 
 PRINT 'Test Complete. Reverting settings...';
-ALTER DATABASE [AdventureWorks2022] SET ALLOW_SNAPSHOT_ISOLATION OFF;
+ALTER DATABASE [AdventureWorks2025] SET ALLOW_SNAPSHOT_ISOLATION OFF;
 GO
 

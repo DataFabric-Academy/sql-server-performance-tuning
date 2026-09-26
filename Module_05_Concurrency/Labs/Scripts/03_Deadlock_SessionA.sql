@@ -1,5 +1,5 @@
 -- Workload: Deadlock (Session A)
- USE AdventureWorks2022;
+ USE AdventureWorks2025;
  GO
  
  -- Step 1: Lock Resource A

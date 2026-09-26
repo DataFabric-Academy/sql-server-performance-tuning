@@ -29,7 +29,7 @@ ORDER BY COUNT(*) DESC;
 -- ============================================================
 
 -- Change database name as needed
-DECLARE @DBName NVARCHAR(128) = 'AdventureWorks2022';
+DECLARE @DBName NVARCHAR(128) = 'AdventureWorks2025';
 
 SELECT
 	database_id

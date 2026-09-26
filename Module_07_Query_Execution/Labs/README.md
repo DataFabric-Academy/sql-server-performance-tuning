@@ -1,56 +1,193 @@
-# Lab: Query Execution และ Internal Warnings
+# Lab 7: Execution Plan Analysis & Query Tuning (บทที่ 7)
 
-## Prerequisites (สิ่งที่ต้องเตรียม)
-- **Database**: `AdventureWorks2022`
+> **ที่มา**: ปรับปรุงจาก Microsoft 10987C **Lab07** (Query execution/plan) + [Microsoft Learn — Intelligent Query Processing](https://learn.microsoft.com/sql/relational-databases/performance/intelligent-query-processing) + [Glenn Berry — SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
+> รูปแบบ: **Instruction + Code block** — ใช้ SSMS เปิด **Include Actual Execution Plan (Ctrl+M)** ตลอดแล็บ
 
-## Scenario (สถานการณ์)
-Developer บ่นว่า Query ของเขา "ไม่ยอมใช้ Index" (กลายเป็น Index Scan) ทั้งๆ ที่เงื่อนไขใน WHERE clause ก็กรองด้วย Primary Key หรือ Indexed Column
-คุณตรวจสอบแล้วสงสัยว่าเป็นเรื่อง **Implicit Conversion** (การแปลง Type แฝง)
+## Prerequisites
 
-## Objectives (วัตถุประสงค์)
-1.  จำลองปัญหา Implicit Conversion โดยการใช้ Data Type ที่ไม่ตรงกัน
-2.  สังเกต **Yellow Warning** (CONVERT_IMPLICIT) ใน Execution Plan
-3.  แก้ไข Query ให้ Data Type ตรงกัน
+- SQL Server 2019+ (แนะนำ **2025 (17.x)** — บทส่วน IQP 2025 ต้องใช้ compat 170), database **AdventureWorks2025**
+- Permission: `VIEW DATABASE STATE`
 
----
+## Scenario
 
-## Exercise 1: Implicit Conversion
+Developer บ่นว่า query "ไม่ยอมใช้ index" ทั้งที่กรองด้วย indexed column นอกจากนี้ report ที่มี optional parameters ทำงานเบาบ้างหนักบ้างไม่ทำนายได้ คุณต้องวิเคราะห์ plan, แก้ SARGability และลอง IQP รุ่นใหม่ของ SQL Server 2025
 
-### Step 1: สร้างปัญหา (Scan)
-1.  เปิดไฟล์ `Module_07_Query_Execution\Scripts\00_Workload_Implicit_Conversions.sql`
-2.  รัน **Step 1**
-    *   Query นี้จะกรอง `NationalIDNumber` (ที่เป็น `NVARCHAR`) แต่ส่งค่าเข้าไปเป็น `INT`
-    *   **กลไก**: SQL Server จะต้องแปลงค่าใน *Column* ให้เป็นตัวเลขเพื่อให้เทียบกันได้ (ตามลำดับความใหญ่ของ Data Type)
-    *   **ผลลัพธ์**: เกิด `Index Scan` (เพราะต้องแปลงข้อมูลทุกแถวในตารางมาเช็ค) ทำให้ช้า
+## Objectives
 
-### Step 2: การวิเคราะห์
-1.  ดูที่ Execution Plan (Ctrl+M)
-2.  มองหา **เครื่องหมายตกใจสีเหลือง (Warning)** บน Operator `SELECT` หรือ `Index Scan`
-3.  คลิกขวาเลือก "Properties" -> ดูหัวข้อ "PlanAffectingConvert" จะเห็นว่ามีการเตือนเรื่อง Convert Implicit
-
-### Step 3: วิธีแก้ไข (Seek)
-1.  รัน **Step 2**
-    *   ส่งค่า Parameter เป็น String (ใส่ Single Quotes ครอบ) ให้ตรงกับ Type ของ Column
-    *   **กลไก**: ไม่จำเป็นต้องแปลงค่าใน Column อีกต่อไป
-    *   **ผลลัพธ์**: ได้ `Index Seek` ทันที
+1. อ่าน Estimated vs Actual plan, หา operator แพงและ cardinality ที่คลาดเคลื่อน
+2. จำลอง/แก้ Implicit Conversion (SARGable)
+3. เทียบ Temp Table vs Table Variable vs CTE
+4. ทดลอง IQP: Memory Grant Feedback และ PSPO/OPPO (2022/2025)
 
 ---
 
-## Exercise 2: การวิเคราะห์ Live Query Statistics (Optional)
-1.  กดปุ่ม "Include Live Query Statistics" ใน SSMS Toolbar
-2.  รัน Query ที่ช้า (Step 1) อีกครั้ง
-3.  สังเกตการไหลของข้อมูล (เส้นประ) จาก Operator หนึ่งไปสู่อีก Operator หนึ่งแบบ Real-time
+## Exercise 1: Implicit Conversion (Non-SARGable)
+
+### Step 1 — สร้างปัญหา: กรอง NVARCHAR ด้วยค่า INT
+
+```sql
+USE AdventureWorks2025;
+GO
+-- Ctrl+M แล้วรัน — สังเกต plan
+SELECT EmployeeID, NationalIDNumber, JobTitle
+FROM HumanResources.Employee
+WHERE NationalIDNumber = 112457891;   -- ส่งค่า INT ไปเทียบ NVARCHAR column
+```
+
+✅ **สังเกต**: plan เป็น **Index Scan** + Warning `CONVERT_IMPLICIT` — SQL ต้องแปลงค่าใน *column* ทุกแถวเพื่อเทียบกับ INT (type precedence สูงกว่า) จึงใช้ seek ไม่ได้
+
+### Step 2 — แก้ให้ตรง type
+
+```sql
+SELECT EmployeeID, NationalIDNumber, JobTitle
+FROM HumanResources.Employee
+WHERE NationalIDNumber = N'112457891';   -- ส่งเป็น string ตรง type
+```
+
+✅ **ผลลัพธ์**: **Index Seek** ทันที — นี่คือหัวใจของ SARGable query
+
+### Step 3 — หา implicit conversion ที่ซุกซ่อนอยู่ทั้ง cache (สไตล์ Glenn Berry)
+
+```sql
+SELECT TOP (20) qs.query_id, qt.query_sql_text,
+       CAST(qp.query_plan AS XML).value(
+           'count(//RelOp/ScalarOperator[@ScalarString[contains(., "CONVERT_IMPLICIT")]])', 'INT'
+       ) AS implicit_converts
+FROM sys.query_store_query AS qs
+JOIN sys.query_store_query_text AS qt ON qs.query_text_id = qt.query_text_id
+JOIN sys.query_store_plan AS qp ON qs.query_id = qp.query_id
+WHERE qt.query_sql_text LIKE '%CONVERT_IMPLICIT%'
+   OR CAST(qp.query_plan AS NVARCHAR(MAX)) LIKE '%CONVERT_IMPLICIT%';
+```
 
 ---
 
-## Exercise 3: Advanced - เจาะลึก Query Optimizer (Conceptual)
-ในแบบฝึกหัดขั้นสูงนี้ ให้โฟกัสที่การใช้เครื่องมือใน SSMS มากกว่าการอ้างถึง Script เฉพาะไฟล์
+## Exercise 2: Cardinality ที่คลาดเคลื่อน → หา operator แพง
 
-### Live Query Statistics
-1.  เลือก Query ที่ทำงานช้าหรือใช้ Cross Join เพื่อจำลอง Long-running query
-2.  เปิดโหมด **Live Query Statistics** ใน SSMS
-3.  ดูจำนวน Logical Rows ที่ไหลจาก Leaf node (ขวา) ขึ้นไปยัง Root (ซ้าย) แบบสดๆ วิธีนี้ช่วยให้รู้เลยว่า Query ค้างอยู่ที่จุดไหน
+### Step 1 — อ่าน plan แบบละเอียด
 
-### Optimizer Transformation Rules (แนวคิด)
-1.  ศึกษา Execution Plan XML และเอกสาร Query Processing Architecture ของ Microsoft เพื่อทำความเข้าใจว่า Optimizer แปลง Logical Tree ไปเป็น Physical Plan อย่างไร
-2.  สังเกตการเลือก Join Type, Access Method และการใช้ Statistics/CE Model ในแผนที่แตกต่างกัน
+```sql
+-- รันแล้วเปิด plan: ชี้ที่แต่ละ operator เทียบ Estimated Rows vs Actual Rows
+SELECT soh.SalesOrderID, COUNT(*) AS line_items
+FROM Sales.SalesOrderHeader AS soh
+JOIN Sales.SalesOrderDetail AS sod ON sod.SalesOrderID = soh.SalesOrderID
+WHERE soh.OrderDate >= DATEADD(YEAR, -1, '2014-06-30')
+GROUP BY soh.SalesOrderID;
+```
+
+✅ **วิธีอ่าน**: operator ที่ Estimated ต่างจาก Actual มาก (>10 เท่า) คือต้นเหตุของ plan แย่ — มักมาจาก stale statistics (Lab 6) หรือ expression ที่ CE เดาไม่ได้
+
+### Step 2 — Non-SARGable แบบ function บน column
+
+```sql
+-- แย่: ใส่ function ครอบ column → scan
+SELECT SalesOrderID FROM Sales.SalesOrderHeader
+WHERE YEAR(OrderDate) = 2014;
+
+-- ดี: เทียบช่วง → seek
+SELECT SalesOrderID FROM Sales.SalesOrderHeader
+WHERE OrderDate >= '2014-01-01' AND OrderDate < '2015-01-01';
+```
+
+---
+
+## Exercise 3: Temp Table vs Table Variable vs CTE
+
+### Step 1 — ทั้งสามรูปแบบพร้อมวัดผล
+
+```sql
+USE AdventureWorks2025;
+GO
+-- (1) Temp Table
+SELECT BusinessEntityID, FirstName, LastName
+INTO #tmp_person
+FROM Person.Person WHERE LastName LIKE N'S%';
+
+SELECT COUNT(*) FROM #tmp_person p
+JOIN Person.EmailAddress e ON e.BusinessEntityID = p.BusinessEntityID;
+DROP TABLE #tmp_person;
+GO
+-- (2) Table Variable (2019+ deferred compilation ช่วยให้ CE ดีขึ้น)
+DECLARE @var_person TABLE (BusinessEntityID INT, FirstName NVARCHAR(50), LastName NVARCHAR(50));
+INSERT @var_person SELECT BusinessEntityID, FirstName, LastName
+FROM Person.Person WHERE LastName LIKE N'S%';
+
+SELECT COUNT(*) FROM @var_person v
+JOIN Person.EmailAddress e ON e.BusinessEntityID = v.BusinessEntityID;
+GO
+-- (3) CTE (ไม่ materialize — ใช้ inline ทุกครั้ง)
+WITH cte_person AS (
+    SELECT BusinessEntityID, FirstName, LastName
+    FROM Person.Person WHERE LastName LIKE N'S%'
+)
+SELECT COUNT(*) FROM cte_person c
+JOIN Person.EmailAddress e ON e.BusinessEntityID = c.BusinessEntityID;
+GO
+```
+
+✅ **สรุปเกณฑ์เลือก**: แถวเยอะ/ต้อง index/อ้างซ้ำหลายรอบ → **temp table**; แถวน้อยใน batch scope → **table variable**; อ่านครั้งเดียวอยากได้โค้ดอ่านง่าย → **CTE** (CTE ไม่ได้ "เร็วกว่า" มันแค่ไม่ materialize)
+
+---
+
+## Exercise 4: IQP — Memory Grant Feedback และ OPPO (2025)
+
+### Step 1 — เปิด compat level 170 (SQL Server 2025)
+
+```sql
+ALTER DATABASE AdventureWorks2025 SET COMPATIBILITY_LEVEL = 170;
+GO
+ALTER DATABASE SCOPED CONFIGURATION SET LAST_QUERY_PLAN_STATS = ON;
+```
+
+### Step 2 — Optional parameters query: ปัญหาคลาสสิก
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.usp_SearchOrders
+    @CustomerID INT = NULL,
+    @Status TINYINT = NULL
+AS
+SELECT SalesOrderID, CustomerID, Status, OrderDate, TotalDue
+FROM Sales.SalesOrderHeader
+WHERE (@CustomerID IS NULL OR CustomerID = @CustomerID)
+  AND (@Status IS NULL OR Status = @Status);
+GO
+-- รันสองแบบ: บางครั้งมี parameter บางครั้งไม่มี
+EXEC dbo.usp_SearchOrders @CustomerID = 29825;   -- แถวน้อย
+EXEC dbo.usp_SearchOrders;                        -- ทั้งตาราง
+```
+
+✅ **สังเกต**: แผนเดียวให้ทั้งสอง pattern เกิด sniffing; บน **SQL Server 2025 (compat 170) ฟีเจอร์ OPPO** จะสร้างหลาย plan ต่อ statement ตามรูปแบบ parameter — ตรวจได้จาก Query Store (`sys.query_store_plan` มีหลาย plan ต่อ query เดียว) หรือ plan XML จะพบ "Optional Parameter Plan Optimization"
+
+### Step 3 — ติดตาม feedback ที่ engine ใช้จริง
+
+```sql
+SELECT q.query_id, p.plan_id, p.is_memory_grant_feedback_adjusted,
+       p.has_compile_replay_script,   -- IQP feedback มี replay ช่วยความเข้ากันได้
+       rs.avg_duration, rs.avg_cpu_time, rs.count_executions
+FROM sys.query_store_query AS q
+JOIN sys.query_store_plan AS p ON q.query_id = p.query_id
+JOIN sys.query_store_runtime_stats AS rs ON p.plan_id = rs.plan_id
+WHERE q.object_id = OBJECT_ID('dbo.usp_SearchOrders')
+ORDER BY rs.avg_duration DESC;
+```
+
+---
+
+## Wrap-up: คำถามท้ายแล็บ
+
+1. ทำไมส่ง parameter type ไม่ตรงทำให้ scan? ใครเป็นคนเลือก type ที่ชนะในการเทียบ? (data type precedence)
+2. เมื่อไรใช้ temp table / table variable / CTE?
+3. OPPO ช่วย optional-parameter pattern ได้อย่างไร และต้องมีเงื่อนไขอะไร? (SQL Server 2025, compat 170)
+
+## Cleanup
+
+```sql
+DROP PROCEDURE IF EXISTS dbo.usp_SearchOrders;
+```
+
+## แหล่งอ้างอิง
+
+- 10987C Lab07 — `Trainer_Docs/10987/Labfiles/Lab07/`
+- Microsoft Learn: [IQP](https://learn.microsoft.com/sql/relational-databases/performance/intelligent-query-processing) · [Optional parameter optimization (2025)](https://learn.microsoft.com/sql/relational-databases/performance/optional-parameter-optimization) · [CE feedback for expressions (2025)](https://learn.microsoft.com/sql/relational-databases/performance/intelligent-query-processing-ce-feedback-for-expressions)
+- Glenn Berry: [SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
+- สคริปต์เสริมในโมดูล: `Scripts/02_Find_Implicit_Conversions.sql`, `Scripts/03_High_IO_Queries.sql`

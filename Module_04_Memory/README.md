@@ -548,3 +548,22 @@ END;
 <summary><b>3. RESOURCE_SEMAPHORE wait type บอกอะไร?</b></summary>
 บอกว่า Query ต้องรอ Memory Grant สำหรับ Sort/Hash Operation แสดงว่ามี Workload ที่ต้องการ Memory เยอะเกินไป
 </details>
+
+---
+
+## 7. 🆕 Modernization Notes: SQL Server 2019 → 2025 (อัปเดตตาม Microsoft Learn)
+
+### 7.1 ตัวเลข Memory ปัจจุบัน
+- **SQL Server 2025 Standard edition: buffer pool สูงสุด 256 GB** ต่อ instance (เพิ่มจาก 128 GB ใน 2022) — วางแผน edition ตามขนาด working set ได้ง่ายขึ้น
+- Standard Developer / Enterprise Developer editions (ฟรี ใช้พัฒนา) ให้ความจุเท่ารุ่นจ่ายเงิน — เหมาะกับการจำลอง Lab
+
+### 7.2 In-Memory OLTP ปี 2025
+- ตอนนี้ **ลบ memory-optimized container/filegroup ที่ว่างได้แล้ว (2025)** — แก้ปัญหา "เคยลอง Hekaton แล้วเลิกใช้ แต่ถอดไม่ได้" ปิดจุดอ่อนสุดท้ายของการนำไปใช้จริง
+- ยังเหมาะกับ pattern: high-throughput insert + lookup (เช่น ETL staging, session store, IoT ingestion) — ไม่ใช่ยาแครามทุกปัญหา
+
+### 7.3 การวัด Memory Pressure ยุคปัจจุบัน
+- **อย่าตัดสินจาก PLE ตัวเดียว**: PLE เป็นค่ารวมทั้ง instance และแปรผันกับขนาด buffer pool — ต้องดูคู่กับ `Page reader/writer sec`, `MEMORYCLERK_SQLBUFFERPAGES`, page faults ของ process, และ wait `RESOURCE_SEMAPHORE` / `WRITE_PAGE` / `RESERVED_MEMORY_ALLOCATION_EXT`
+- ดู memory ต่อ NUMA node (`sys.dm_os_memory_nodes`) ไม่ใช่แค่รวม
+- PMEM/Hybrid Buffer Pool: เข้าถึง data page บน PMEM โดยตรง กระทบการตีความ `sys.dm_os_buffer_descriptors`
+
+> อ้างอิง: [Memory Management Architecture Guide](https://learn.microsoft.com/sql/relational-databases/memory-management-architecture-guide), [What's new in SQL Server 2025](https://learn.microsoft.com/sql/sql-server/what-s-new-in-sql-server-2025)

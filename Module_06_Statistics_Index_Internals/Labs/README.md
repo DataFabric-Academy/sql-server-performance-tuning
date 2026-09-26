@@ -1,96 +1,224 @@
-# Lab: กลยุทธ์ Indexing (Indexing Strategies)
+# Lab 6: Missing/Unused Index, Covering Index & Statistics (บทที่ 6)
 
-## Prerequisites (สิ่งที่ต้องเตรียม)
-- **Database**: `AdventureWorks2022`
+> **ที่มา**: ปรับปรุงจาก Microsoft 10987C **Lab06** (Indexes/Statistics) + [Microsoft Learn — Missing index DMVs](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-db-missing-index-details-transact-sql) + [Glenn Berry — SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/) (หมวด Index & Statistics)
+> รูปแบบ: **Instruction + Code block** — ทุก Step รันได้ทันทีใน SSMS
 
-## Scenario (สถานการณ์)
-Report ดึงข้อมูลลูกค้าทำงานช้ามาก ทั้งๆ ที่เป็นการค้นหาแค่บางส่วน (Partial match)
-คุณสงสัยว่าอาจเป็นเพราะ **Missing Index** หรือเกิด **Key Lookup** ที่ไม่จำเป็น
+## Prerequisites
 
-## Objectives (วัตถุประสงค์)
-1.  ระบุ Missing Index Warning
-2.  วิเคราะห์ความเสียหาย (Cost) ของ Key Lookups
-3.  สร้าง Covering Index เพื่อแก้ปัญหาอย่างถาวร
+- SQL Server 2019+ (แนะนำ **2025 (17.x)**), database **AdventureWorks2025**
+- Permission: `VIEW DATABASE STATE`, สิทธิ์ CREATE/DROP INDEX บน DB ทดสอบ
 
----
+## Scenario
 
-## Exercise 1: Missing Index & Key Lookups
+Report ค้นหาลูกค้าช้ามาก ทั้งที่กรองเพียงบางส่วน คุณสงสัยว่าขาด index ที่เหมาะสม มี Key Lookup ที่แพง และ statistics เก่าจน optimizer ตัดสินใจผิด
 
-### Step 1: Baseline (Table Scan / Index Scan)
-1.  เปิดไฟล์ `Scripts\01_Missing_Index.sql`
-2.  เปิด "Include Actual Execution Plan" (Ctrl+M)
-3.  รัน Query **Step 1**
-    *   Query นี้ค้นหา `Person.Person` โดยใช้คอลัมน์ที่ไม่มี Index (เช่น `Title` หรือคอลัมน์สมมติ)
-    *   **Execution Plan**: จะเห็นเป็น `Clustered Index Scan` (อ่านข้อมูลทั้งตาราง)
-    *   **ข้อความสีเขียว**: `Missing Index (Impact 99.xxx%)` <-- นี่คือคำใบ้จาก SQL Server
+## Objectives
 
-### Step 2: ลองสร้าง Index แบบไม่สมบูรณ์ (Key Lookup)
-1.  รัน **Step 2** เพื่อสร้าง Non-clustered index แบบธรรมดา
-2.  รัน Query เดิมอีกครั้ง
-    *   Plan เปลี่ยนเป็น: `Index Seek` + `Key Lookup` (Nested Loops)
-    *   ถ้าจำนวนแถวที่ดึงมาเยอะมากๆ การทำ Lookup อาจจะ **ช้ากว่า** Scan ก็ได้ (Random I/O)
-
-### Step 3: สร้าง Covering Index (สมบูรณ์แบบ)
-1.  รัน **Step 3** เพื่อเพิ่ม `INCLUDE` columns ลงไปใน Index
-2.  รัน Query เดิมอีกครั้ง
-    *   Plan กลายเป็น: `Index Seek` (เพียวๆ) ไม่ต้องทำ Lookup แล้ว
-    *   Reads: ลดลงมหาศาล
+1. ระบุ Missing Index จาก execution plan และ DMV
+2. สร้าง Covering Index เพื่อกำจัด Key Lookup และวัดผลก่อน-หลัง
+3. วิเคราะห์ unused/duplicate index ก่อนตัดสินใจ DROP
+4. ตรวจ stale statistics และอัปเดตอย่างถูกวิธี
 
 ---
 
-## Exercise 2: Columnstore / Advanced Index Analysis (Optional)
-1.  รัน `Scripts\06_Advanced_Index_Analysis.sql`
-2.  เปรียบเทียบความเร็วและลักษณะการใช้ Index ระหว่างรูปแบบต่างๆ (รวมถึงกรณี Columnstore หากมีใน Script)
+## Exercise 1: Missing Index → Covering Index
+
+### Step 1 — หา query ที่ไม่มี index รองรับ (เปิด Ctrl+M ก่อนรัน)
+
+```sql
+USE AdventureWorks2025;
+GO
+SET STATISTICS IO, TIME ON;
+SELECT BusinessEntityID, FirstName, LastName, EmailAddress
+FROM Person.Person AS p
+JOIN Person.EmailAddress AS e ON e.BusinessEntityID = p.BusinessEntityID
+WHERE p.LastName = N'Anderson'
+  AND p.FirstName LIKE N'%K%';
+```
+
+✅ **สังเกต**: plan เป็น Index Scan/Clustered Scan และ SSMS ขึ้น **Missing Index (Impact ~99%)** — สังเกตว่า Green text แนะนำ CREATE INDEX ให้ทันที (ยังไม่ต้องเชื่อ 100%)
+
+### Step 2 — ดูคำแนะนำสะสมจาก DMV
+
+```sql
+SELECT id.statement AS target_table,
+       id.equality_columns,
+       id.inequality_columns,
+       id.included_columns,
+       gs.user_seeks, gs.user_scans,
+       gs.avg_total_user_cost * gs.avg_user_impact * (gs.user_seeks + gs.user_scans) AS benefit_score
+FROM sys.dm_db_missing_index_details AS id
+JOIN sys.dm_db_missing_index_groups AS g ON id.index_handle = g.index_handle
+JOIN sys.dm_db_missing_index_group_stats AS gs ON g.index_group_handle = gs.group_handle
+ORDER BY benefit_score DESC;
+```
+
+### Step 3 — วัด Baseline ที่ยังไม่มี index (บันทึก logical reads)
+
+```sql
+SET STATISTICS IO ON;
+SELECT * FROM Person.Person WHERE LastName = N'Anderson';
+-- จดค่า logical reads จากแท็บ Messages
+SET STATISTICS IO OFF;
+```
+
+### Step 4 — สร้าง Covering Index (key + INCLUDE)
+
+```sql
+CREATE NONCLUSTERED INDEX IX_Person_LastName_FirstName_cover
+ON Person.Person (LastName, FirstName)
+INCLUDE (BusinessEntityID);
+```
+
+### Step 5 — รัน query เดิมซ้ำแล้วเทียบ
+
+```sql
+SET STATISTICS IO ON;
+SELECT * FROM Person.Person WHERE LastName = N'Anderson';
+SET STATISTICS IO OFF;
+```
+
+✅ **ผลที่คาดหวัง**: plan เปลี่ยนเป็น **Index Seek** ไม่มี Key Lookup, logical reads ลดลงหลายเท่าถึงสิบเท่า
+
+> **ระวัง**: ถ้า query ดึงหลายพันแถว Key Lookup แบบเก่าอาจแพงกว่า scan — ตัดสินจากผลจริงเสมอ
 
 ---
 
-## Exercise 3: Advanced - การวิเคราะห์ Index ด้วย Query Store
-*แบบฝึกหัดขั้นสูงนี้จะใช้ `02_Index_Analysis_QueryStore.sql` เพื่อดูประวัติการใช้งาน Index*
+## Exercise 2: Unused / Duplicate Index วิเคราะห์ก่อนทิ้ง
 
-### Concept (แนวคิด)
-DMV ปกติจะรีเซ็ตเมื่อ Restart แต่ Query Store เก็บข้อมูลถาวร เราสามารถดูได้ว่า Index ไหนที่ "Missing" มานานแล้ว หรือ Index ไหนที่มีแต่คนอ่านแต่ไม่มีคนใช้
+### Step 1 — รวมสถิติอ่าน vs เขียนต่อ index (สไตล์ Glenn Berry)
 
-### Steps (ขั้นตอน)
-1.  เปิดและรัน: `Scripts\02_Index_Analysis_QueryStore.sql`
-2.  Script นี้จะดึงข้อมูลจาก Query Store เพื่อแนะนำ Missing Index โดยอิงจากประวัติการใช้งานจริง (Historical Workload) ซึ่งแม่นยำกว่าการดูจาก DMV ณ ขณะนั้น
+```sql
+SELECT OBJECT_SCHEMA_NAME(i.object_id) AS schema_name,
+       OBJECT_NAME(i.object_id) AS table_name,
+       i.name AS index_name,
+       i.type_desc,
+       COALESCE(us.user_seeks, 0) + COALESCE(us.user_scans, 0)
+           + COALESCE(us.user_lookups, 0) AS total_reads,
+       COALESCE(us.user_updates, 0) AS total_writes,
+       us.last_user_seek, us.last_user_update
+FROM sys.indexes AS i
+LEFT JOIN sys.dm_db_index_usage_stats AS us
+    ON i.object_id = us.object_id AND i.index_id = us.index_id
+    AND us.database_id = DB_ID()
+WHERE i.index_id > 1          -- ข้าม heap/clustered
+  AND OBJECTPROPERTY(i.object_id, 'IsUserTable') = 1
+ORDER BY total_reads ASC, total_writes DESC;
+```
+
+✅ **เกณฑ์ตัดสินใจ**: `total_reads = 0` แต่ `total_writes` สูง → ผู้สมัครถูก DROP (ยืนยันว่าไม่ใช่ PK/Unique constraint และไม่ใช่ index ที่ batch รายเดือนใช้ — ต้องมี baseline ยาว ≥ 1 business cycle)
+
+### Step 2 — หา duplicate index (คอลัมน์ key ซ้ำกัน)
+
+```sql
+SELECT OBJECT_SCHEMA_NAME(object_id) + '.' + OBJECT_NAME(object_id) AS table_name,
+       name AS index_name,
+       (SELECT STRING_AGG(c.name, ',') WITHIN GROUP (ORDER BY ic.key_ordinal)
+        FROM sys.index_columns AS ic
+        WHERE ic.object_id = i.object_id AND ic.index_id = i.index_id AND ic.is_included_column = 0) AS key_cols,
+       (SELECT STRING_AGG(c.name, ',')
+        FROM sys.index_columns AS ic
+        WHERE ic.object_id = i.object_id AND ic.index_id = i.index_id AND ic.is_included_column = 1) AS include_cols
+FROM sys.indexes AS i
+WHERE index_id > 1 AND OBJECTPROPERTY(object_id, 'IsUserTable') = 1
+ORDER BY table_name, key_cols;
+```
+
+### Step 3 (Optional) — หา fragmentation ที่ควรจัดการ
+
+```sql
+SELECT OBJECT_NAME(ps.object_id) AS table_name,
+       i.name AS index_name,
+       ps.avg_fragmentation_in_percent,
+       ps.page_count
+FROM sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, 'LIMITED') AS ps
+JOIN sys.indexes AS i ON ps.object_id = i.object_id AND ps.index_id = i.index_id
+WHERE ps.avg_fragmentation_in_percent > 30 AND ps.page_count > 1000
+ORDER BY ps.avg_fragmentation_in_percent DESC;
+-- > 30% + ใหญ่พอ → REBUILD; 5-30% → REORGANIZE; < 5% ปล่อยไว้
+```
 
 ---
 
-## Exercise 4: ตรวจสอบและแก้ไข Out of Date Statistics
-*แบบฝึกหัดนี้จะใช้ `03_Check_Stale_Stats.sql` เพื่อดูแลสุขภาพของ Statistics*
+## Exercise 3: Stale Statistics
 
-### Concept (แนวคิด)
-ถ้า `modification_counter` (จำนวนแถวที่เปลี่ยน) สูงเกินไปเมื่อเทียบกับจำนวนแถวทั้งหมด (`rows`) Optimizer อาจเลือก Plan ผิด (เช่นคิดว่าตารางยังมีข้อมูลน้อย เลยเลือก Key Lookup ทั้งที่ข้อมูลบวมไปเยอะแล้ว)
+### Step 1 — หา statistics ที่เก่าและเปลี่ยนแปลงเยอะ (Glenn Berry)
 
-### Steps (ขั้นตอน)
-1.  **Generate Changes**: ลอง Insert หรือ Update ข้อมูลจำนวนมากในตารางใดตารางหนึ่ง (เช่นใช้ Script ใน Module 3)
-2.  **Check Status**: รัน `Scripts\03_Check_Stale_Stats.sql`
-3.  **Analyze**: ดูคอลัมน์ `Percent Changed`
-    *   ถ้า > 20% แล้ว Last Updated นานมาแล้ว -> **ควร Update**
-4.  **Fix**: สั่ง Update Stats
-    ```sql
-    UPDATE STATISTICS ชื่อตาราง;
-    -- หรือเจาะจงเฉพาะตัว
-    UPDATE STATISTICS ชื่อตาราง ชื่อStatistics;
-    ```
-5.  รัน Script ตรวจสอบอีกครั้ง `modification_counter` จะต้องกลับเป็น 0
+```sql
+SELECT OBJECT_SCHEMA_NAME(s.object_id) AS schema_name,
+       OBJECT_NAME(s.object_id) AS table_name,
+       s.name AS stats_name,
+       sp.last_updated,
+       sp.rows, sp.modification_counter,
+       CAST(100.0 * sp.modification_counter / NULLIF(sp.rows, 0) AS DECIMAL(10,2)) AS pct_changed
+FROM sys.stats AS s
+CROSS APPLY sys.dm_db_stats_properties(s.object_id, s.stats_id) AS sp
+WHERE OBJECTPROPERTY(s.object_id, 'IsUserTable') = 1
+  AND sp.modification_counter > 0
+ORDER BY pct_changed DESC;
+```
+
+✅ **เกณฑ์พอสมควร**: `pct_changed > 20%` และ `last_updated` นาน → ควรอัปเดต (ตั้งแต่ SQL Server 2016+ threshold dynamic อยู่แล้วสำหรับ DB compat 130+ แต่บาง workload ยังต้องจัดการเอง)
+
+### Step 2 — สร้าง data skew แล้วทดสอบผลของ stale stats
+
+```sql
+USE AdventureWorks2025;
+GO
+-- จำลอง: เพิ่มแถวจำนวนมากโดยไม่อัปเดต stats
+CREATE TABLE dbo.StatsTest (Col1 INT IDENTITY, Status TINYINT DEFAULT 0, Pad CHAR(50) DEFAULT 'x');
+INSERT dbo.StatsTest (Status) VALUES (0);      -- seed row
+GO 100
+CREATE INDEX IX_StatsTest_Status ON dbo.StatsTest (Status);
+INSERT dbo.StatsTest (Status)
+SELECT TOP (50000) 1 FROM sys.all_objects a CROSS JOIN sys.all_columns b;
+GO
+```
+
+### Step 3 — เทียบ estimated rows ก่อน/หลัง UPDATE STATISTICS
+
+```sql
+-- ก่อน: สังเกต estimated row count ที่คลาดเคลื่อน (Ctrl+M)
+SELECT COUNT(*) FROM dbo.StatsTest WHERE Status = 1;
+
+UPDATE STATISTICS dbo.StatsTest IX_StatsTest_Status WITH FULLSCAN;
+
+-- หลัง: estimated ตรงกับ actual
+SELECT COUNT(*) FROM dbo.StatsTest WHERE Status = 1;
+```
 
 ---
 
-## Exercise 5: ตรวจสอบและกำจัด Index ขยะ (Bad Indexes)
-*แบบฝึกหัดนี้จะใช้ `05_Check_Bad_Indexes.sql` เพื่อลดภาระของระบบ*
+## Exercise 4 (Optional, SQL Server 2025): CE Feedback for Expressions
 
-### Concept (แนวคิด)
-Index ทุกตัวที่เราสร้างคือ "ภาระ" ในการ Maintain (เมื่อมี Insert/Update) ถ้า Index ไหนโดน Update บ่อยแต่ไม่เคยโดน Read เลย (Unused) หรือ Index ไหนซ้ำซ้อนกับเพื่อน (Duplicate) ควรพิจารณาลบทิ้ง (DROP)
+```sql
+-- ตรวจว่า IQP features ทำงานอยู่หรือไม่ (compat level 170)
+SELECT name, compatibility_level, is_query_store_on
+FROM sys.databases WHERE database_id = DB_ID();
+ALTER DATABASE AdventureWorks2025 SET COMPATIBILITY_LEVEL = 170;  -- SQL Server 2025
+-- CE feedback for expressions จะเรียนรู้ CE ของ expression เช่น DATEDIFF/CONVERT จากการรันจริง
+-- ดู XEvent ที่เกี่ยวข้อง: query_optimizer_estimate_cardinality / CE feedback events
+```
 
-### Steps (ขั้นตอน)
-1.  **Generate Load**: รัน Workload อะไรก็ได้เพื่อให้มีการ Update ข้อมูล
-2.  **Check Status**: รัน `Scripts\05_Check_Bad_Indexes.sql`
-3.  **Analyze (Part 1 - Unused)**:
-    *   ดูรายการที่ `TotalReads` = 0 แต่ `user_updates` สูงๆ
-    *   **Decision**: ถ้าไม่ใช่ Primary Key หรือ Unique Constraint -> **DROP** ได้เลย
-4.  **Analyze (Part 2 - Duplicates)**:
-    *   ดูรายการที่ `KeyCols` และ `IncludeCols` เหมือนกันเป๊ะ
-    *   **Decision**: เก็บตัวนึงไว้ แล้ว **DROP** อีกตัวออกไป
+---
 
+## Wrap-up: คำถามท้ายแล็บ
 
+1. Missing Index DMV แนะนำ index ใด และคุณปรับปรุงคำแนะนำนั้นอย่างไรก่อนใช้จริง? (จัด key/include ตาม query ที่มีอยู่จริง ตรวจซ้ำซ้อน)
+2. index ใดของ database นี้ "จ่ายแรมรับความว่างเปล่า"? (reads = 0, writes สูง)
+3. เพราะอะไร stale statistics ทำให้ optimizer เลือก plan ที่แย่? (CE อ่าน histogram เก่า ประเมิน rows ผิด → เลือก join/lookup ผิด)
+
+## Cleanup
+
+```sql
+USE AdventureWorks2025;
+DROP INDEX IF EXISTS IX_Person_LastName_FirstName_cover ON Person.Person;
+DROP TABLE IF EXISTS dbo.StatsTest;
+```
+
+## แหล่งอ้างอิง
+
+- 10987C Lab06 — `Trainer_Docs/10987/Labfiles/Lab06/`
+- Microsoft Learn: [Missing index DMVs](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-db-missing-index-details-transact-sql) · [Columnstore what's new (2025)](https://learn.microsoft.com/sql/relational-databases/indexes/columnstore-indexes-what-s-new) · [Persisted stats on secondaries (2025)](https://learn.microsoft.com/sql/relational-databases/performance/persisted-stats-secondary-replicas)
+- Glenn Berry: [SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
+- สคริปต์เสริมในโมดูล: `Scripts/01_Index_Fragmentation.sql`, `Scripts/02_Missing_Indexes.sql`

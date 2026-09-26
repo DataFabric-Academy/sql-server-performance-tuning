@@ -1,5 +1,5 @@
 -- Workload: Missing Index & Key Lookup
- USE AdventureWorks2022;
+ USE AdventureWorks2025;
  GO
  
  -- Step 1: The Problem Query

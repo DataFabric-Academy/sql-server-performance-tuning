@@ -1,90 +1,189 @@
-# Lab: Plan Caching และ Parameter Sniffing
+# Lab 8: Query Store — Regression, Force Plan & Automatic Tuning (บทที่ 8)
 
-## Prerequisites (สิ่งที่ต้องเตรียม)
-- **Database**: `AdventureWorks2022`
+> **ที่มา**: ปรับปรุงจาก Microsoft 10987C **Lab08** (Plan cache/Query Store) + [Microsoft Learn — Query Store](https://learn.microsoft.com/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store) + [Query Store Hints](https://learn.microsoft.com/sql/relational-databases/performance/query-store-hints-best-practices)
+> รูปแบบ: **Instruction + Code block** — ใช้ SSMS + T-SQL
 
-## Scenario (สถานการณ์)
-Stored Procedure ตัวหนึ่งทำงานเร็วมากสำหรับ User บางคน แต่ช้าต้วมเตี้ยมสำหรับ User อื่น
-คุณสงสัยว่าเป็น **Parameter Sniffing** ซึ่งเกิดจากการที่ SQL Server สร้าง Plan สำหรับลูกค้า "รายย่อย" (Small data) แล้วนำมาใช้ซ้ำกับลูกค้า "รายใหญ่" (Big data) หรือในทางกลับกัน
+## Prerequisites
 
-## Objectives (วัตถุประสงค์)
-1.  จำลองพฤติกรรม Parameter Sniffing
-2.  สังเกตความต่างของ "Parameter Compiled Value" vs "Parameter Runtime Value" ใน Plan
-3.  แก้ไขปัญหาโดยใช้ `OPTION (RECOMPILE)` หรือ `OPTIMIZE FOR`
+- SQL Server 2019+ (แนะนำ **2025 (17.x)**), database **AdventureWorks2025**
+- Permission: `ALTER DATABASE` บน DB ทดสอบ (Lab ทำบน VM)
 
----
+## Scenario
 
-## Exercise 1: Parameter Sniffing
+Stored procedure ตัวหนึ่งเคยเร็วมากแต่ "บางวันช้าตึ้ง" โดยไม่มีใครแก้โค้ด คุณต้องใช้ Query Store หา plan ที่ถดถอย (regressed) แล้วบังคับใช้ plan ที่ดี ทั้งแบบ GUI และ T-SQL พร้อมลอง Query Store Hints / `ABORT_QUERY_EXECUTION` ของ SQL Server 2025
 
-### Step 1: สร้างปัญหา (Stored Proc)
-1.  เปิดไฟล์ `Scripts\01_Parameter_Sniffing.sql`
-2.  รัน **Step 1** เพื่อสร้าง Stored Procedure ชื่อ `GetOrdersByLocation`
-    *   SP นี้ดึงข้อมูล Order ตาม `TerritoryID`
-    *   *Note*: ข้อมูลมีความเบ้ (Data Skew) บาง Territory มี Order น้อย บางที่ก็มีเป็นล้าน
+## Objectives
 
-### Step 2: แผนที่ดี (Seek)
-1.  รัน **Step 2** (ส่งค่า Territory ที่มีข้อมู่น้อย)
-    *   Optimizer เลือก `Index Seek` + `Key Lookup` ซึ่งมีประสิทธิภาพดีมากสำหรับ rows น้อยๆ
-
-### Step 3: แผนที่แย่ (Sniffing)
-1.  รัน **Step 3** (ส่งค่า Territory ที่มีข้อมูลเยอะ) **โดยไม่ต้อง Compile ใหม่** (ใช้ Plan เดิมจาก Step 2)
-    *   SQL Server จะนำ "Seek Plan" กลับมาใช้ซ้ำ
-    *   เนื่องจากต้องดึงข้อมูลหลายพัน rows การทำ Lookup หลายพันครั้ง (Random I/O) จึงช้ากว่าการทำ Scan (Sequential I/O) มาก
-    *   **อาการ**: `Logical Reads` พุ่งสูงผิดปกติ
-
-### Step 4: วิธีแก้ไข
-1.  รัน **Step 4** โดยเติม `OPTION (RECOMPILE)`
-    *   SQL Server จะสร้าง Plan ใหม่ให้ทุกครั้งที่รัน ซึ่งรอบนี้จะได้ `Cluster Scan` ที่เหมาะสมกับข้อมูลเยอะๆ
+1. เปิดและตั้งค่า Query Store
+2. จำลอง performance regression และหา plan ที่ถดถอย
+3. Force Plan ผ่าน GUI และ T-SQL
+4. ใช้ Query Store Hints + ABORT_QUERY_EXECUTION (2025) และ Automatic Plan Correction
 
 ---
 
----
+## Exercise 1: เปิด Query Store
 
-## Exercise 2: Monitoring & Fixing Regressions (Microsoft Learn Scenario)
-
-ในแบบฝึกหัดนี้ คุณจะจำลองสถานการณ์ "Performance Regression" (ประสิทธิภาพแย่ลงหลังการเปลี่ยนแปลง) และใช้ Query Store เพื่อวิเคราะห์และแก้ไข
-
-### Step 1: เตรียม Environment
-1.  เปิดไฟล์ `Module_08_Plan_Caching\Scripts\02_Query_Store_Regression_Lab.sql`
-2.  รัน **Section 1-3** เพื่อสร้าง Good Plan (Index Seek)
-    *   รัน Query 20 รอบเพื่อสร้างประวัติการทำงานที่ดี
-3.  รัน **Section 4** เพื่อจำลอง Regression (Drop Index -> Force Scan)
-    *   รัน Query อีก 20 รอบเพื่อสร้างประวัติการทำงานที่แย่
-
-### Step 2: วิเคราะห์ด้วย SSMS Reports
-1.  ใน **Object Explorer** ไปที่ Database `AdventureWorks2022` > **Query Store**
-2.  เปิดรายงาน **Top Resource Consuming Queries**
-    *   คุณจะเห็น Query `usp_GetTransactionHistory` อยู่ในอันดับต้นๆ
-    *   สังเกตว่ามี **2 Plans** (วงกลม 2 วงในกราฟขวา):
-        *   Plan ID น้อย (เก่า): Duration ต่ำ (Good Plan)
-        *   Plan ID มาก (ใหม่): Duration สูง (Regressed Plan)
-3.  เปิดรายงาน **Regressed Queries**
-    *   รายงานนี้จะกรองเฉพาะ Query ที่ประสิทธิภาพ "แย่ลง" อย่างชัดเจนในช่วงเวลาที่เลือก
-    *   ช่วยให้ DBA โฟกัสปัญหาได้ตรงจุดกว่าการดู Top Resource ทั่วไป
-
-### Step 3: การตัดสินใจ (Decision Making)
-*   ในสถานการณ์จริงที่ Plan เก่ายัง valid (เช่น Parameter Sniffing) คุณสามารถปุ่ม **Force Plan** เพื่อบังคับใช้ Plan เก่าได้เลย
-*   ในแล็บนี้ เรา Drop Index ไป ทำให้ Plan เก่าใช้งานไม่ได้ (Invalid)
-*   **Solution**: รัน **Section 5** ใน Script เพื่อสร้าง Index คืน (Performance จะกลับมาดีเหมือนเดิม)
+```sql
+ALTER DATABASE AdventureWorks2025 SET QUERY_STORE = ON;
+ALTER DATABASE AdventureWorks2025 SET QUERY_STORE
+(
+    OPERATION_MODE = READ_WRITE,
+    QUERY_CAPTURE_MODE = AUTO,          -- 2025: มี CUSTOM ให้ปรับละเอียดได้
+    MAX_STORAGE_SIZE_MB = 1024,
+    DATA_FLUSH_INTERVAL_SECONDS = 900,
+    MAX_PLANS_PER_QUERY = 200
+);
+GO
+-- ตรวจสถานะ
+SELECT actual_state_desc, query_capture_mode_desc, max_storage_size_mb
+FROM sys.database_query_store_options;
+```
 
 ---
 
-## Exercise 3: Query Store (Forcing Plan) - Optional Practice
-1.  ใช้รายงาน **Top Resource Consuming Queries** เพื่อดูประวัติ
-2.  ลองกด **Force Plan** (เลือก Plan ที่คิดว่าดี)
-3.  สังเกตไอคอน "ติ๊กถูก" ที่หน้า Plan ID แสดงว่า Plan Forcing ทำงานแล้ว
-4.  หากต้องการยกเลิก ให้กด **Unforce Plan**
+## Exercise 2: จำลอง Regression
+
+### Step 1 — สร้าง index ดีและรัน query ให้เกิดประวัติ "ยุคทอง"
+
+```sql
+USE AdventureWorks2025;
+GO
+CREATE INDEX IX_SalesOrderHeader_CustomerID_OrderDate
+ON Sales.SalesOrderHeader (CustomerID, OrderDate)
+INCLUDE (TotalDue, Status);
+
+-- รัน ~10 รอบ (เก็บประวัติ Good Plan)
+EXEC ('SELECT SalesOrderID, OrderDate, TotalDue FROM Sales.SalesOrderHeader WHERE CustomerID = 11091;');
+GO 10
+```
+
+### Step 2 — ทำลาย index = บังคับให้เกิด regressed plan
+
+```sql
+DROP INDEX IX_SalesOrderHeader_CustomerID_OrderDate ON Sales.SalesOrderHeader;
+GO
+EXEC ('SELECT SalesOrderID, OrderDate, TotalDue FROM Sales.SalesOrderHeader WHERE CustomerID = 11091;');
+GO 10   -- ประวัติ Bad Plan (Scan)
+```
+
+### Step 3 — สร้าง index กลับ (ทำให้ force plan ทำงานได้ในขั้นถัดไป)
+
+```sql
+CREATE INDEX IX_SalesOrderHeader_CustomerID_OrderDate
+ON Sales.SalesOrderHeader (CustomerID, OrderDate)
+INCLUDE (TotalDue, Status);
+```
 
 ---
 
-## Exercise 3: Advanced - การดึง Plan สดจาก Memory (แนวคิด)
-ในแบบฝึกหัดขั้นสูงนี้ ให้ใช้ DMV และ SSMS โดยไม่อ้างถึง Script เฉพาะไฟล์
+## Exercise 3: วิเคราะห์ Regressed Plan (GUI + T-SQL)
 
-### Concept (แนวคิด)
-บางครั้งเราไม่สามารถรัน `SET STATISTICS XML ON` ได้เพราะ Query มันรันค้างอยู่ (และนานมาก) เราต้องการเห็น Plan ของมัน **เดี๋ยวนี้**
+### Step 1 — GUI: รายงาน Regressed Queries
 
-### Steps (ขั้นตอน)
-1.  จำลอง Long-running query ในอีกหน้าต่างหนึ่ง (เช่นใช้ `WAITFOR DELAY`)
-2.  ในหน้าต่างใหม่ รัน DMV เช่น `sys.dm_exec_requests` ร่วมกับ `sys.dm_exec_query_plan` เพื่อดึง `query_plan` ของ session ที่น่าสงสัย
-3.  คลิกที่ Link XML ในคอลัมน์ `query_plan` ในผลลัพธ์ของ DMV
-4.  **ผลลัพธ์**: คุณจะเห็น Execution Plan ของงานที่กำลังวิ่งอยู่ทันที (Live Plan)
+1. Object Explorer → `AdventureWorks2025` → **Query Store** → **Regressed Queries**
+2. เลือก query ของเรา — จะเห็น **2 plans**: Plan ID น้อย (duration ต่ำ) vs Plan ID มาก (duration สูง)
+3. คลิก plan ที่ดี → ปุ่ม **Force Plan** → สังเกตเครื่องหมายถูกที่ plan
+
+### Step 2 — T-SQL: หา regressed plan ด้วยตัวเอง
+
+```sql
+SELECT q.query_id,
+       qt.query_sql_text,
+       p.plan_id, p.is_forced_plan,
+       MIN(CASE WHEN rsi.start_time < DATEADD(DAY, -1, SYSUTCDATETIME())
+                THEN rs.avg_duration END) AS avg_duration_old,
+       MAX(rs.avg_duration) AS avg_duration_recent
+FROM sys.query_store_query AS q
+JOIN sys.query_store_query_text AS qt ON q.query_text_id = qt.query_text_id
+JOIN sys.query_store_plan AS p ON q.query_id = p.query_id
+JOIN sys.query_store_runtime_stats AS rs ON p.plan_id = rs.plan_id
+JOIN sys.query_store_runtime_stats_interval AS rsi
+    ON rs.runtime_stats_interval_id = rsi.runtime_stats_interval_id
+WHERE qt.query_sql_text LIKE '%SalesOrderHeader WHERE CustomerID = 11091%'
+GROUP BY q.query_id, qt.query_sql_text, p.plan_id, p.is_forced_plan
+ORDER BY q.query_id, p.plan_id;
+```
+
+### Step 3 — Force Plan ด้วย T-SQL
+
+```sql
+DECLARE @good_plan_id BIGINT;
+SELECT TOP (1) @good_plan_id = p.plan_id
+FROM sys.query_store_query AS q
+JOIN sys.query_store_plan AS p ON q.query_id = p.query_id
+JOIN sys.query_store_runtime_stats AS rs ON p.plan_id = rs.plan_id
+WHERE q.query_id = <query_id จาก Step 2>
+GROUP BY p.plan_id
+ORDER BY AVG(rs.avg_duration) ASC;
+
+EXEC sp_query_store_force_plan @query_id = <query_id>, @plan_id = @good_plan_id;
+
+-- ตรวจยืนยัน
+SELECT plan_id, is_forced_plan, force_failure_count, last_force_failure_reason_desc
+FROM sys.query_store_plan
+WHERE query_id = <query_id>;
+
+-- รัน query เดิมซ้ำ แล้วดูใน sys.query_store_plan ว่า forced plan ถูกใช้จริง
+```
+
+---
+
+## Exercise 4: Query Store Hints + ABORT_QUERY_EXECUTION (SQL Server 2025)
+
+### Step 1 — บังคับ hint ผ่าน Query Store (แก้ปัญหาโดยไม่แก้โค้ด)
+
+```sql
+EXEC sp_query_store_set_hints
+    @query_id = <query_id>,
+    @query_hints = N'OPTION (MAXDOP 1)';
+GO
+-- ดู hints ที่ตั้งไว้
+SELECT * FROM sys.query_store_query_hints;
+```
+
+### Step 2 — บล็อก query มีปัญหาไม่ให้รัน (2025)
+
+```sql
+-- ABORT_QUERY_EXECUTION: query ที่ถูก hint จะได้ error 8799 ทันทีที่พยายามรัน
+EXEC sp_query_store_set_hints
+    @query_id = <query_id>,
+    @query_hints = N'OPTION (USE HINT (''ABORT_QUERY_EXECUTION''))';
+```
+
+✅ **ใช้เมื่อไร**: ad-hoc query หนักที่ app ยิงมาแต่แก้โค้ดไม่ได้ทัน — บล็อกชั่วคราวเพื่อรักษา server ทั้งตัว
+
+### Step 3 — Automatic Plan Correction (ให้ระบบแก้เอง)
+
+```sql
+ALTER DATABASE AdventureWorks2025 SET AUTOMATIC_TUNING (FORCE_LAST_GOOD_PLAN = ON);
+GO
+-- ดูคำแนะนำที่ระบบให้
+SELECT reason, score,
+       script,
+       JSON_VALUE(details, '$.regressedPlanId') AS regressed_plan,
+       JSON_VALUE(details, '$.recommendedPlanId') AS recommended_plan
+FROM sys.dm_db_tuning_recommendations;
+```
+
+---
+
+## Wrap-up: คำถามท้ายแล็บ
+
+1. Force Plan ล้มเหลวได้จากอะไร? (index ที่ plan อ้างถูกลบ, schema เปลี่ยน — ดู `last_force_failure_reason_desc`)
+2. Query Store Hints ต่างจากแก้โค้ดใส่ OPTION() ตรงไหน และเหมาะกับสถานการณ์ใด?
+3. ทำไม AUTO capture mode ถึงเหมาะกับ production? (เก็บเฉพาะ query ที่ใช้ resource พอสมควร ลด overhead/storage)
+
+## Cleanup
+
+```sql
+USE AdventureWorks2025;
+EXEC sp_query_store_remove_query @query_id = <query_id>;  -- ลบ hints/force ที่เกี่ยวข้อง
+ALTER DATABASE AdventureWorks2025 SET AUTOMATIC_TUNING (FORCE_LAST_GOOD_PLAN = OFF);
+DROP INDEX IF EXISTS IX_SalesOrderHeader_CustomerID_OrderDate ON Sales.SalesOrderHeader;  -- ตามเดิมก่อนแล็บ
+```
+
+## แหล่งอ้างอิง
+
+- 10987C Lab08 — `Trainer_Docs/10987/Labfiles/Lab08/`
+- Microsoft Learn: [Query Store](https://learn.microsoft.com/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store) · [Query Store hints + ABORT_QUERY_EXECUTION](https://learn.microsoft.com/sql/relational-databases/performance/query-store-hints-best-practices) · [Automatic tuning](https://learn.microsoft.com/sql/relational-databases/automatic-tuning/automatic-tuning)
+- สคริปต์เสริมในโมดูล: `Scripts/02_Query_Store_Regression_Lab.sql`

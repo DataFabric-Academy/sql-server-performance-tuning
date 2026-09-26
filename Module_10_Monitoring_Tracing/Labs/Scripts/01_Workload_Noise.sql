@@ -1,5 +1,5 @@
 -- Workload: Background Noise (Random Activity)
- USE AdventureWorks2022;
+ USE AdventureWorks2025;
  GO
  SET NOCOUNT ON;
  

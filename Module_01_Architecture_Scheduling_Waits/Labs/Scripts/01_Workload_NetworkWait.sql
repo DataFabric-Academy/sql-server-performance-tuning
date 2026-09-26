@@ -2,7 +2,7 @@
 -- Instructions: Run this in SSMS. Ensure "Results to Grid" is selected.
 -- Analysis: Check sys.dm_os_wait_stats for ASYNC_NETWORK_IO
 
-USE AdventureWorks2022;
+USE AdventureWorks2025;
 GO
 
 -- Select a large amount of data

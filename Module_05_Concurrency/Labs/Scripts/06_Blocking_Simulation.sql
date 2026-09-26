@@ -3,7 +3,7 @@
 -- à¸•à¹‰à¸­à¸‡à¹ƒà¸Šà¹‰ 2 Session à¹ƒà¸™à¸à¸²à¸£à¸£à¸±à¸™
 
 -- === [Session 1] - The Blocker (à¸œà¸¹à¹‰à¸£à¹‰à¸²à¸¢) ===
-USE [AdventureWorks2022]; -- à¸«à¸£à¸·à¸­ DB à¸­à¸·à¹ˆà¸™
+USE [AdventureWorks2025]; -- à¸«à¸£à¸·à¸­ DB à¸­à¸·à¹ˆà¸™
 GO
 
 CREATE TABLE dbo.BlockTest (ID INT, Name CHAR(10));
@@ -23,7 +23,7 @@ BEGIN TRAN;
 
 -- === [Session 2] - The Victim (à¸œà¸¹à¹‰à¸–à¸¹à¸à¸à¸£à¸°à¸—à¸³) ===
 /*
-USE [AdventureWorks2022];
+USE [AdventureWorks2025];
 GO
 
 PRINT 'Session 2: à¸žà¸¢à¸²à¸¢à¸²à¸¡à¸­à¹ˆà¸²à¸™à¸‚à¹‰à¸­à¸¡à¸¹à¸¥... (à¸ˆà¸°à¸„à¹‰à¸²à¸‡)';

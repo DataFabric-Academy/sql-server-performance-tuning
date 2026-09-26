@@ -6,13 +6,13 @@
     Database: AdventureWorks (Any version)
 */
 
-USE [AdventureWorks2022];
+USE [AdventureWorks2025];
 GO
 
 -- 1. Setup Environment: Ensure Query Store is ON and Clear
-ALTER DATABASE [AdventureWorks2022] SET QUERY_STORE = ON;
-ALTER DATABASE [AdventureWorks2022] SET QUERY_STORE (OPERATION_MODE = READ_WRITE, INTERVAL_LENGTH_MINUTES = 10);
-ALTER DATABASE [AdventureWorks2022] SET QUERY_STORE CLEAR; -- Start fresh for lab
+ALTER DATABASE [AdventureWorks2025] SET QUERY_STORE = ON;
+ALTER DATABASE [AdventureWorks2025] SET QUERY_STORE (OPERATION_MODE = READ_WRITE, INTERVAL_LENGTH_MINUTES = 10);
+ALTER DATABASE [AdventureWorks2025] SET QUERY_STORE CLEAR; -- Start fresh for lab
 GO
 
 -- 2. Create Helper Procedure to generate regressions

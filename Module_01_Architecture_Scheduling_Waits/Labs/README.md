@@ -1,93 +1,239 @@
-# Lab: การวิเคราะห์ Wait Statistics และ CPU Pressure
+# Lab 1: Wait Statistics & CPU Pressure Analysis (บทที่ 1)
 
-## Prerequisites (สิ่งที่ต้องเตรียม)
-- **Database**: `AdventureWorks2022` (ติดตั้งหรือ Restore เรียบร้อยแล้ว)
-- **Tools**: SSMS (SQL Server Management Studio) และ OSTRESS (ถ้ามี) หรือใช้การเปิด Query Window หลายๆ หน้าต่าง
+> **ที่มา**: ปรับปรุงจาก Microsoft 10987C **Lab01** (CPU and NUMA / Monitor Schedulers / Waits) + [Microsoft Learn — sys.dm_os_wait_stats](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql) + [Glenn Berry — SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
+> รูปแบบ: **Instruction + Code block** — ทุก Step รันได้ทันทีใน SSMS (สคริปต์เสริมอยู่ใน `Scripts/`)
 
-## Scenario (สถานการณ์)
-สถานการณ์: บริษัท Proseware Inc. มีผู้ใช้งานร้องเรียนว่า "ระบบช้ามาก"
-คำขอของคุณที่จะให้ทีม Infrastructure "เพิ่ม CPU" ถูกปฏิเสธ เนื่องจากกราฟ Monitor โชว์ว่า CPU Usage ใช้งานแค่ 60% เท่านั้น
-คุณสงสัยว่าปัญหาไม่ได้อยู่ที่ความจุของ CPU แต่เป็นเรื่องของ **Waits** (การรอคอย) หรือ **Inefficient CPU usage** (Signal Waits)
+## Prerequisites
 
-## Objectives (วัตถุประสงค์)
-1.  วิเคราะห์ **Wait Statistics** เพื่อระบุคอขวด (Bottleneck)
-2.  แยกแยะระหว่าง **Resource Waits** (เช่น Disk/Network/Lock) และ **Signal Waits** (CPU Pressure)
-3.  จำลองสถานการณ์และวิเคราะห์ Wait Type รูปแบบต่างๆ
+- SQL Server 2019+ (แนะนำ **2025 (17.x)**), database **AdventureWorks2025**
+- Permission: `VIEW SERVER STATE` (หรือบทบาท `##MS_ServerPerformanceStateReader##`)
+- เปิด SSMS ขึ้นมา 3 หน้าต่าง query (Window A, B, C)
 
----
+## Scenario
 
-## Exercise 1: การจำลองและวิเคราะห์ Resource Waits (ASYNC_NETWORK_IO / CXPACKET)
+บริษัท Proseware Inc. มีผู้ใช้ร้องเรียนว่า "ระบบช้ามาก" ทีม Infrastructure ปฏิเสธการเพิ่ม CPU เพราะกราฟแสดง CPU ใช้แค่ ~60% คุณสงสัยว่าปัญหาไม่ใช่ความจุ CPU แต่เป็น **Waits** และ **Inefficient CPU usage (Signal Waits)** — ให้พิสูจน์ด้วย DMV
 
-### Step 1: ดูค่า Baseline ปัจจุบัน
-1.  เปิด SSMS และรัน Query เพื่อดู Wait Stats ปัจจุบัน:
-    -- ใช้ Script ที่มีการกรองค่าที่ไม่จำเป็นออกแล้ว:
-    เปิดและรัน: `Scripts\05_Wait_Stats_Deep_Dive.sql`
-    -- Script นี้จะกรอง 'Benign' waits (เช่น LazyWriter, Checkpoint) ออก เพื่อให้โฟกัสที่ปัญหาจริง
+## Objectives
 
-### Step 2: สร้าง Workload (ASYNC_NETWORK_IO)
-1.  เปิดไฟล์ `Scripts\01_Workload_NetworkWait.sql`
-2.  รัน Script นี้ (Script จะดึงข้อมูลจำนวนมหาศาลแต่จะดึงแบบช้าๆ เพื่อจำลองพฤติกรรม Client Application ที่ประมวลผลไม่ทัน)
-    *   *Note*: ใน SSMS, การเลือก "Grid Results" อาจทำให้เกิด Wait นี้ได้ถ้า Network ช้าหรือข้อมูลเยอะมาก
-
-### Step 3: การวิเคราะห์ผล
-1.  กลับไปรัน Query Wait Stats อีกครั้ง
-2.  มองหา **ASYNC_NETWORK_IO**
-    *   **การตีความ**: SQL Server พร้อมส่งข้อมูลแล้ว แต่ฝั่ง Client App (หรือ Network) รับข้อมูลไม่ทัน
-    *   **การแก้ไข**: ต้องไปจูนที่ Application Code (ให้ดึงเฉพาะ Column ที่ใช้) หรือตรวจสอบ Network Bandwidth
+1. ตรวจสอบ CPU/NUMA topology ของ instance
+2. Monitor Schedulers และหาสัญญาณ CPU pressure
+3. วิเคราะห์ Wait Statistics แยก Resource Waits vs Signal Waits
+4. จำลอง workload จริงและติดตาม wait แบบ real-time
 
 ---
 
-## Exercise 2: การจำลอง High CPU (Signal Waits & SOS_SCHEDULER_YIELD)
+## Exercise 1: CPU and NUMA Topology (Window A)
 
-### Step 1: สร้าง High CPU Workload
-1.  เปิดไฟล์ `Scripts\02_Workload_HighCPU.sql`
-2.  รัน Script นี้ (Script จะทำการคำนวณทางคณิตศาสตร์อย่างหนักวนลูปไปเรื่อยๆ)
-3.  (Optional) รัน Script นี้ซ้ำในหลายๆ หน้าต่าง (New Query Window) เพื่อให้กิน CPU ครบทุก Core
+### Step 1 — ตรวจสอบข้อมูล CPU, NUMA และ Worker ของ instance
 
-### Step 2: การวิเคราะห์ผล
-1.  Query จาก `sys.dm_os_wait_stats`
-2.  คำนวณค่า **Signal Wait Ratio**:
-    ```sql
-    SELECT 
-        wait_type, 
-        (signal_wait_time_ms * 1.0 / wait_time_ms) * 100 AS SignalWaitPercent
+```sql
+SELECT cpu_count AS logical_cpus,
+       socket_count AS physical_sockets,
+       cores_per_socket,
+       numa_node_count,
+       max_workers_count,
+       scheduler_count,
+       scheduler_total_count,
+       sqlserver_start_time
+FROM sys.dm_os_sys_info;
+```
+
+✅ **สังเกต**: `max_workers_count` คือเพดาน Worker Threads (มักหลักหลายร้อยถึงหลายพันตาม CPU) — ถ้า workload ใช้เกินเกือบ 100% จะเกิด `THREADPOOL` wait
+
+### Step 2 — ดู NUMA nodes และ CPU affinity
+
+```sql
+SELECT node_id,
+       node_state_desc,          -- ONLINE / ONLINE AUTOMATIC = Soft-NUMA
+       online_scheduler_count,
+       active_worker_count,
+       avg_load_balance,
+       cpu_affinity_mask
+FROM sys.dm_os_nodes;
+```
+
+✅ **สังเกต**: ถ้าเห็น `ONLINE AUTOMATIC` แปลว่า Soft-NUMA ถูกสร้างอัตโนมัติ (SQL Server 2016+)
+
+### Step 3 — ตรวจ scheduler ต่อ NUMA node และสถานะ (Glenn Berry style)
+
+```sql
+SELECT parent_node_id,
+       scheduler_id,
+       status,
+       is_online,
+       is_idle,
+       current_tasks_count,
+       runnable_tasks_count,     -- > 0 ต่อเนื่อง = CPU queue
+       work_queue_count,
+       pending_disk_io_count,
+       load_factor
+FROM sys.dm_os_schedulers
+WHERE scheduler_id < 1048576      -- visible schedulers เท่านั้น
+ORDER BY parent_node_id, scheduler_id;
+```
+
+---
+
+## Exercise 2: วัด Signal Wait Ratio (CPU Pressure Indicator) (Window A)
+
+### Step 1 — คำนวณ Resource vs Signal Waits รวมทั้ง instance
+
+```sql
+SELECT SUM(signal_wait_time_ms) * 1.0 / SUM(wait_time_ms) * 100
+           AS signal_wait_pct,                 -- > 10-15% = CPU pressure
+       SUM(wait_time_ms - signal_wait_time_ms) * 1.0
+           / SUM(wait_time_ms) * 100 AS resource_wait_pct,
+       SUM(waiting_tasks_count) AS total_waiting_tasks
+FROM sys.dm_os_wait_stats
+WHERE wait_time_ms > 0;
+```
+
+### Step 2 — Top waits แบบกรอง benign waits ออก (สไตล์ Glenn Berry)
+
+```sql
+WITH Waits AS
+(
+    SELECT wait_type, wait_time_ms / 1000.0 AS wait_s,
+           (wait_time_ms - signal_wait_time_ms) / 1000.0 AS resource_s,
+           signal_wait_time_ms / 1000.0 AS signal_s,
+           waiting_tasks_count
     FROM sys.dm_os_wait_stats
-    WHERE wait_time_ms > 1000
-    ORDER BY SignalWaitPercent DESC;
-    ```
-3.  **SOS_SCHEDULER_YIELD**: ค่านี้บ่งบอกถึง Processor Pressure (Quantum exhaustion) คือ Thread ทำงานครบเวลา 4ms แล้วต้องยอมถอย (Yield) ให้ Thread อื่นทำงานต่อ
+    WHERE wait_type NOT IN (
+        N'BROKER_EVENTHANDLER', N'BROKER_RECEIVE_WAITFOR', N'BROKER_TASK_STOP',
+        N'BROKER_TO_FLUSH', N'BROKER_TRANSMITTER', N'CHECKPOINT_QUEUE',
+        N'CHKPT', N'CLR_AUTO_EVENT', N'CLR_MANUAL_EVENT', N'CLR_SEMAPHORE',
+        N'DBMIRROR_DBM_EVENT', N'DBMIRROR_EVENTS_QUEUE', N'DBMIRROR_WORKER_QUEUE',
+        N'DBMIRRORING_CMD', N'DIRTY_PAGE_POLL', N'DISPATCHER_QUEUE_SEMAPHORE',
+        N'EXECSYNC', N'FSAGENT', N'FT_IFTS_SCHEDULER_IDLE_WAIT',
+        N'FT_IFTSHC_MUTEX', N'HADR_CLUSAPI_CALL', N'HADR_FILESTREAM_IOMGR_IOCOMPLETION',
+        N'HADR_LOGCAPTURE_WAIT', N'HADR_NOTIFICATION_DEQUEUE', N'HADR_TIMER_TASK',
+        N'HADR_WORK_QUEUE', N'KSOURCE_WAKEUP', N'LAZYWRITER_SLEEP',
+        N'LOGMGR_QUEUE', N'MEMORY_ALLOCATION_EXT', N'ONDEMAND_TASK_QUEUE',
+        N'PARALLEL_REDO_DRAIN_WORKER', N'PARALLEL_REDO_LOG_CACHE',
+        N'PARALLEL_REDO_TRAN_LIST', N'PARALLEL_REDO_WORKER_SYNC',
+        N'PARALLEL_REDO_WORKER_WAIT_WORK', N'PREEMPTIVE_XE_GETTARGETSTATE',
+        N'PVS_PREALLOCATE', N'PWAIT_ALL_COMPONENTS_INITIALIZED',
+        N'PWAIT_DIRECTLOGCONSUMER_GETNEXT', N'QDS_PERSIST_TASK_MAIN_LOOP_SLEEP',
+        N'QDS_ASYNC_QUEUE', N'QDS_CLEANUP_STALE_QUERIES_TASK_MAIN_LOOP_SLEEP',
+        N'QDS_SHUTDOWN_QUEUE', N'REDO_THREAD_PENDING_WORK', N'REQUEST_FOR_DEADLOCK_SEARCH',
+        N'RESOURCE_QUEUE', N'SERVER_IDLE_CHECK', N'SLEEP_BPOOL_FLUSH',
+        N'SLEEP_DBSTARTUP', N'SLEEP_DCOMSTARTUP', N'SLEEP_MASTERDBREADY',
+        N'SLEEP_MASTERMDREADY', N'SLEEP_MASTERUPGRADED', N'SLEEP_MSDBSTARTUP',
+        N'SLEEP_SYSTEMTASK', N'SLEEP_TASK', N'SLEEP_TEMPDBSTARTUP',
+        N'SNI_HTTP_ACCEPT', N'SOS_WORK_DISPATCHER', N'SP_SERVER_DIAGNOSTICS_SLEEP',
+        N'SQLTRACE_BUFFER_FLUSH', N'SQLTRACE_INCREMENTAL_FLUSH_SLEEP',
+        N'SQLTRACE_WAIT_ENTRIES', N'VDI_CLIENT_OTHER', N'WAIT_FOR_RESULTS',
+        N'WAITFOR', N'WAITFOR_TASKSHUTDOWN', N'WAIT_XTP_RECOVERY',
+        N'WAIT_XTP_HOST_WAIT', N'WAIT_XTP_OFFLINE_CKPT_NEW_LOG',
+        N'WAIT_XTP_CKPT_CLOSE', N'XE_DISPATCHER_JOIN', N'XE_DISPATCHER_WAIT',
+        N'XE_LIVE_TARGET_TVF', N'XE_TIMER_EVENT')
+    AND waiting_tasks_count > 0
+)
+SELECT TOP (25) wait_type, waiting_tasks_count,
+       wait_s AS total_wait_s,
+       CAST(100.0 * wait_s / SUM(wait_s) OVER () AS DECIMAL(10,1)) AS pct_total,
+       resource_s, signal_s
+FROM Waits
+ORDER BY wait_s DESC;
+```
+
+✅ **สังเกต**: จด Top 5 ไว้เทียบกับผลหลังจากจำลอง workload
 
 ---
 
-## Exercise 3: การวิเคราะห์แบบ Real-time ด้วย `sys.dm_exec_requests`
+## Exercise 3: จำลอง CPU Pressure (Window B)
 
-1.  ในขณะที่ Workload กำลังทำงาน ให้เปิดหน้าต่างใหม่
-2.  รันคำสั่ง:
-    ```sql
-    SELECT 
-        r.session_id,
-        r.status,
-        r.wait_type,
-        r.wait_time,
-        r.last_wait_type,
-        t.text
-    FROM sys.dm_exec_requests r
-    CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) t
-    WHERE r.session_id <> @@SPID AND r.is_user_process = 1;
-    ```
-3.  สังเกตคอลัมน์ `wait_type` ที่เปลี่ยนแปลงไปเรื่อยๆ แบบ Real-time
+### Step 1 — รัน workload กิน CPU (คำนวณหนัก ๆ วนลูป)
+
+```sql
+-- Window B: รันทิ้งไว้ (~60 วินาที) แล้วไปทำ Exercise 4 ที่ Window C
+DECLARE @n BIGINT = 0, @i BIGINT = 0;
+WHILE @i < 500000000
+BEGIN
+    SET @n = @n + (@i % 7) * 3;
+    SET @i += 1;
+END
+SELECT @n;
+```
+
+> **Tip**: เปิด Window B ซ้ำ 2–3 หน้าต่างแล้วรันพร้อมกัน เพื่อให้กิน CPU ครบทุก scheduler
+
+### Step 2 — ดู runnable queue แบบ real-time (Window C)
+
+```sql
+SELECT scheduler_id,
+       current_tasks_count,
+       runnable_tasks_count,   -- ค้าง > 0 = task ต่อคิวรอ CPU
+       current_workers_count,
+       active_workers_count,
+       work_queue_count
+FROM sys.dm_os_schedulers
+WHERE scheduler_id < 1048576 AND status = 'VISIBLE ONLINE'
+ORDER BY runnable_tasks_count DESC;
+```
+
+### Step 3 — ดู wait ของ session ที่กำลังรัน
+
+```sql
+SELECT r.session_id, r.status, r.wait_type, r.wait_time,
+       r.last_wait_type, r.cpu_time, r.total_elapsed_time,
+       LEFT(t.text, 80) AS running_sql
+FROM sys.dm_exec_requests AS r
+CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) AS t
+WHERE r.session_id <> @@SPID AND r.is_user_process = 1;
+```
+
+✅ **สังเกต**: `wait_type = SOS_SCHEDULER_YIELD` + `runnable_tasks_count > 0` = quantum exhaustion (หมดคิว 4 ms ต่อครั้งแล้วต้องต่อคิว)
+
+### Step 4 — วัดผลกระทบที่ Signal Waits หลัง workload จบ
+
+```sql
+-- รันซ้ำคำสั่ง Step 1 ของ Exercise 2
+-- สังเกต signal_wait_pct สูงขึ้นชั่วคราว และ SOS_SCHEDULER_YIELD พุ่งใน Top waits
+```
 
 ---
 
-## Exercise 4: Advanced - เจาะลึก Yield Mechanism
-*แบบฝึกหัดขั้นสูงนี้จะใช้ `04_Yield_Mechanism.sql` เพื่อดูการทำงานภายในของ SQL Server Scheduler*
+## Exercise 4: จำลอง ASYNC_NETWORK_IO (Client รับไม่ทัน)
 
-### Concept (แนวคิด)
-SQL Server ใช้ระบบ "Cooperative Multitasking" กล่าวคือ Thread จะทำงานบน CPU ได้รอบละไม่เกิน 4ms (Quantum) ถ้าทำงานไม่เสร็จ จะต้องยอมถอย (**Yield**) เพื่อให้คนอื่นได้ใช้ CPU บ้าง ซึ่งจะทำให้เกิด Wait Type ชื่อ `SOS_SCHEDULER_YIELD`
+### Step 1 — ส่ง result set ใหญ่ช้า ๆ ไปที่ client
 
-### Steps (ขั้นตอน)
-1.  รัน High CPU Workload (`02_Workload_HighCPU.sql`) ใน Session แยกต่างหาก
-2.  เปิดและรัน: `Scripts\04_Yield_Mechanism.sql`
-3.  สังเกตค่า:
-    *   **yield_count**: ตัวเลขจะวิ่งขึ้นเร็วมาก แสดงว่ามีการสลับ Context บ่อย
-    *   **runnable_tasks_count**: ถ้าค่านี้ > 0 อย่างต่อเนื่อง ยืนยันได้เลยว่าเกิด CPU Pressure (มีงานรอต่อคิวในสถานะ "Runnable")
+```sql
+-- Window B: รันทิ้งไว้
+SELECT so.* , (SELECT COUNT(*) FROM sys.objects) AS filler
+FROM sys.all_objects AS so
+CROSS JOIN sys.all_columns AS sc;
+```
+
+### Step 2 — ตรวจ wait ปัจจุบันของ session นั้น
+
+```sql
+-- Window C:
+SELECT session_id, wait_type, wait_time, blocking_session_id, cpu_time
+FROM sys.dm_exec_requests
+WHERE session_id <> @@SPID;
+```
+
+✅ **สังเกต**: `ASYNC_NETWORK_IO` = SQL Server พร้อมส่งข้อมูล แต่ client/network รับไม่ทัน — ปัญหาอยู่ฝั่ง application ไม่ใช่ storage
+
+---
+
+## Wrap-up: คำถามท้ายแล็บ
+
+1. Signal Wait Ratio ของ instance ก่อน/หลัง workload ต่างกันเท่าไร? สรุปได้ว่า CPU เป็น bottleneck จริงหรือไม่?
+2. `SOS_SCHEDULER_YIELD` กับ `CXPACKET` ต่างกันอย่างไรในเชิงการตีความ?
+3. ถ้า `runnable_tasks_count` ค้าง > 0 ตลอดเวลา แต่ CPU utilization แค่ 60% — เป็นไปได้ไหม? เพราะอะไร (Hint: single-threaded query / SOS Scheduler)
+
+## Cleanup
+
+```sql
+-- Reset wait stats (ทำเฉพาะบน VM ทดสอบ — ห้ามรันบน Production เพราะสถิติสะสมจะหาย)
+DBCC SQLPERF('sys.dm_os_wait_stats', CLEAR);
+```
+
+## แหล่งอ้างอิง
+
+- 10987C Lab01 (CPU and NUMA, Monitor Schedulers, Waits) — `Trainer_Docs/10987/Labfiles/Lab01/`
+- Microsoft Learn: [sys.dm_os_wait_stats](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql) · [sys.dm_os_schedulers](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-os-schedulers-transact-sql) · [Thread and Task Architecture Guide](https://learn.microsoft.com/sql/relational-databases/thread-and-task-architecture-guide)
+- Glenn Berry: [SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
+- สคริปต์เสริมในโมดูล: `Scripts/01_Check_Schedulers.sql`, `Scripts/02_Wait_Stats_Analysis.sql`, `Labs/Scripts/05_Wait_Stats_Deep_Dive.sql`

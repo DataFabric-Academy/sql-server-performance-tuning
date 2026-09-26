@@ -17,7 +17,7 @@
 
 -- Lab: Index Seek vs Index Scan Analysis
 
-USE [AdventureWorks2022];
+USE [AdventureWorks2025];
 GO
 
 -- 1. Setup Data

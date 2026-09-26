@@ -1,7 +1,7 @@
 ﻿-- Lab: Stale Statistics Effect
 -- à¸§à¸±à¸•à¸–à¸¸à¸›à¸£à¸°à¸ªà¸‡à¸„à¹Œ: à¹à¸ªà¸”à¸‡à¹ƒà¸«à¹‰à¹€à¸«à¹‡à¸™à¸§à¹ˆà¸² Statistics à¸—à¸µà¹ˆà¹„à¸¡à¹ˆà¸­à¸±à¸›à¹€à¸”à¸•à¸ªà¹ˆà¸‡à¸œà¸¥à¸•à¹ˆà¸­à¸„à¹ˆà¸² Estimated Rows à¸­à¸¢à¹ˆà¸²à¸‡à¹„à¸£
 
-USE [AdventureWorks2022]; -- à¸«à¸£à¸·à¸­ DB Test
+USE [AdventureWorks2025]; -- à¸«à¸£à¸·à¸­ DB Test
 GO
 
 -- 1. Setup Table & Data

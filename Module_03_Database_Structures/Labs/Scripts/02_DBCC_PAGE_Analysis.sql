@@ -21,7 +21,7 @@
 -- à¸§à¸±à¸•à¸–à¸¸à¸›à¸£à¸°à¸ªà¸‡à¸„à¹Œ: à¸à¸¶à¸à¹ƒà¸Šà¹‰à¸‡à¸²à¸™ DBCC PAGE à¹€à¸žà¸·à¹ˆà¸­à¸”à¸¹à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ à¸²à¸¢à¹ƒà¸™ (Header, Slot Array)
 -- à¸„à¸³à¹€à¸•à¸·à¸­à¸™: DBCC PAGE à¹€à¸›à¹‡à¸™ Undocumented Command à¹ƒà¸«à¹‰à¹ƒà¸Šà¹‰à¹ƒà¸™à¸à¸²à¸£à¹€à¸£à¸µà¸¢à¸™à¸£à¸¹à¹‰à¹€à¸—à¹ˆà¸²à¸™à¸±à¹‰à¸™
 
-USE [AdventureWorks2022]; -- à¸«à¸£à¸·à¸­à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¹€à¸›à¹‡à¸™ Database à¸—à¸µà¹ˆà¸¡à¸µà¸­à¸¢à¸¹à¹ˆ
+USE [AdventureWorks2025]; -- à¸«à¸£à¸·à¸­à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¹€à¸›à¹‡à¸™ Database à¸—à¸µà¹ˆà¸¡à¸µà¸­à¸¢à¸¹à¹ˆ
 GO
 
 -- 1. à¸ªà¸£à¹‰à¸²à¸‡à¸•à¸²à¸£à¸²à¸‡à¸—à¸”à¸ªà¸­à¸š
@@ -39,14 +39,14 @@ GO
 -- 3. à¸«à¸² Page ID à¸‚à¸­à¸‡à¸•à¸²à¸£à¸²à¸‡à¸™à¸µà¹‰
 -- DBCC IND (DatabaseName, TableName, IndexID)
 -- IndexID: 0=Heap, 1=Clustered Index
-DBCC IND ('AdventureWorks2022', 'dbo.PageLab', 0);
+DBCC IND ('AdventureWorks2025', 'dbo.PageLab', 0);
 -- à¹ƒà¸«à¹‰à¸ˆà¸”à¸ˆà¸³à¸„à¹ˆà¸² 'PagePID' à¸—à¸µà¹ˆ PageType = 1 (Data Page) à¸¡à¸²
 
 -- 4. à¸ªà¹ˆà¸­à¸‡à¸”à¸¹à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ à¸²à¸¢à¹ƒà¸™ Page
 -- DBCC PAGE (DatabaseName, FileID, PageID, PrintOption)
 -- PrintOption: 0=Header, 1=Chunks, 2=Whole, 3=Row Details
 DBCC TRACEON(3604); -- à¹€à¸›à¸´à¸” Output à¸­à¸­à¸à¸«à¸™à¹‰à¸²à¸ˆà¸­
-DBCC PAGE ('AdventureWorks2022', 1, <à¹ƒà¸ªà¹ˆ_PageID_à¸•à¸£à¸‡à¸™à¸µà¹‰>, 3);
+DBCC PAGE ('AdventureWorks2025', 1, <à¹ƒà¸ªà¹ˆ_PageID_à¸•à¸£à¸‡à¸™à¸µà¹‰>, 3);
 DBCC TRACEOFF(3604);
 
 /*

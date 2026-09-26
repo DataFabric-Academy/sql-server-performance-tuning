@@ -131,3 +131,21 @@ Wait Statistics: เพื่อดูว่า SQL Server กำลังรอ
 การ Tuning ไม่ใช่งานที่ทำครั้งเดียวจบ เพราะข้อมูลเปลี่ยนตลอดเวลา Plan ที่เคยดีอาจจะแย่ลงได้ ต้องคอย Monitor เสมอ
 </details>
 
+
+---
+
+## 6. 🆕 Modernization Notes: Top-down Framework บน SQL Server 2025
+
+กรอบ Top-down ยังเดิม: **Wait Stats → Resource → Query → Index → Config** แต่เครื่องมือต่อชั้นได้อัปเกรด:
+
+| ชั้น | เครื่องมือ 2025 |
+|:-----|:----------------|
+| Waits | `sys.dm_os_wait_stats` delta + Query Store `sys.query_store_wait_stats` (ต่อ query ต่อช่วงเวลา) |
+| CPU | DOP feedback (เปิด default 2025), `sys.dm_exec_requests` + `sys.dm_os_schedulers` |
+| Memory | `sys.dm_os_memory_clerks`, Memory Grant Feedback (persisted), tempdb space governance (2025) |
+| I/O | `sys.dm_io_virtual_file_stats` + DiskSpd ยืนยัน storage |
+| Concurrency | **Optimized Locking (2025)** ลด LCK_M_* ของ OLTP ปกติ — ถ้าเจอ blocking หนักทั้งที่เปิดใช้ มักเป็น long-running write จริง |
+| Query | Query Store + Force Plan / **ABORT_QUERY_EXECUTION (2025)** กัน query พิษ; last actual plan ด้วย `sys.dm_exec_query_plan_stats` |
+| พิสูจน์ | XEvents (time-bound sessions 2025) + Glenn Berry 2025 diagnostic queries |
+
+> อ้างอิง: [Performance Dashboard](https://learn.microsoft.com/sql/tools/performance-dashboard), [Query Store](https://learn.microsoft.com/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store), [Glenn Berry resources](https://glennsqlperformance.com/resources/)

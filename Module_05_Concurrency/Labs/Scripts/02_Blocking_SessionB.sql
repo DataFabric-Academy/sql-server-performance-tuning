@@ -1,5 +1,5 @@
 -- Workload: Blocking (Session B - The Victim)
- USE AdventureWorks2022;
+ USE AdventureWorks2025;
  GO
  
  PRINT 'Attempting to read blocked data...';

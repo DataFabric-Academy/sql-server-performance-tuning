@@ -21,7 +21,7 @@
         5. Kill the bad sessions or Stop the query execution to resolve.
 
     PREREQUISITES:
-        - AdventureWorks2022 or newer
+        - AdventureWorks2025 or newer
 */
 
 -- Lab: The "Broken Server" Challenge
@@ -31,7 +31,7 @@
 -- ==========================================
 -- [WINDOW 1] The Blocker (à¸•à¸±à¸§à¸¥à¹‡à¸­à¸„)
 -- ==========================================
-USE [AdventureWorks2022];
+USE [AdventureWorks2025];
 GO
 BEGIN TRAN;
     UPDATE Person.Person 
@@ -55,7 +55,7 @@ END
 -- ==========================================
 -- [WINDOW 3] The IO Storm (à¸­à¹ˆà¸²à¸™à¸«à¸™à¸±à¸)
 -- ==========================================
-USE [AdventureWorks2022];
+USE [AdventureWorks2025];
 GO
 PRINT 'Window 3: Generating Random I/O...';
 WHILE 1=1

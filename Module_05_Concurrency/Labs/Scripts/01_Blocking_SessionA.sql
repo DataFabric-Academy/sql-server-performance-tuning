@@ -1,5 +1,5 @@
 -- Workload: Blocking (Session A - The Blocker)
- USE AdventureWorks2022;
+ USE AdventureWorks2025;
  GO
  
  BEGIN TRANSACTION;

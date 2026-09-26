@@ -274,3 +274,28 @@ Logical Reads คือการอ่านจาก Memory (Buffer Pool) ซ�
 การแปลง Data Type โดยอัตโนมัติเนื่องจาก Type ไม่ตรงกัน (เช่นเทียบ `VARCHAR` กับ `NVARCHAR`) ซึ่งมักจะทำให้ใช้ Index ไม่ได้ (Index Scan แทน Seek)
 </details>
 
+
+---
+
+## 6. 🆕 Modernization Notes: Intelligent Query Processing ครบทุกรุ่น (2017 → 2025)
+
+| ฟีเจอร์ | รุ่นที่เริ่ม | สาระสำคัญ |
+|:--------|:------------|:----------|
+| Adaptive Joins | 2017 (DB compat 140) | เลือก join strategy หลัง scan แถวแรก |
+| Memory Grant Feedback | 2017 / **persisted ใน 2019+** | ปรับ grant จาก spill/overgrant รอบก่อน |
+| Interleaved Execution (MSTVFs) | 2017 | หยุด optimize เพื่อรู้ค่า card จริงก่อน |
+| Scalar UDF Inlining | 2019 | UDF สเกลาร์แปลงเป็น relational expressions |
+| Batch Mode on Rowstore | 2019 | รับ batch mode ได้แม้ไม่มี columnstore |
+| Table Variable Deferred Compilation | 2019 | ใช้ card จริงของ table variable |
+| Parameter Sensitive Plan Optimization (PSPO) | 2022 (compat 160) | **หลาย plan ต่อ statement** สำหรับ data ที่เบ้ |
+| Degree of Parallelism (DOP) Feedback | 2022 → **เปิด default ใน 2025** | ปรับ DOP อัตโนมัติตาม repeatable query |
+| **Optional Parameter Plan Optimization (OPPO)** | **2025 (compat 170)** | ต่อยอด PSPO สำหรับ query แบบ optional parameters (`@p IS NULL OR col = @p`) |
+| **CE Feedback for Expressions** | **2025** | เรียนรู้ CE ของ expression ข้าม query |
+
+- ตรวจสอบ/ตั้ง compat level 170 เพื่อเปิดใช้ฟีเจอร์รุ่น 2025:
+  ```sql
+  ALTER DATABASE AdventureWorks2025 SET COMPATIBILITY_LEVEL = 170;
+  ```
+- ใช้ `sys.query_store_plan` คอลัมน์ `has_compile_replay_script` / XEvent ของ IQP ติดตามการทำงานของ feedback
+
+> อ้างอิง: [Intelligent Query Processing](https://learn.microsoft.com/sql/relational-databases/performance/intelligent-query-processing), [What's new in SQL Server 2025 — Query Store and IQP](https://learn.microsoft.com/sql/sql-server/what-s-new-in-sql-server-2025)

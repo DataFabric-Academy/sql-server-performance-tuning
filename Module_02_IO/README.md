@@ -185,3 +185,26 @@ DMV นี้ให้ข้อมูลประสิทธิภาพระ�
 <summary><b>3. Allocation Unit Size ที่แนะนำสำหรับ SQL Server คือเท่าไหร่?</b></summary>
 64KB เพราะ SQL Server ทำ I/O เป็น Extent (64KB = 8 Pages) การตั้งค่านี้ช่วยลด Overhead ของ File System
 </details>
+
+---
+
+## 8. 🆕 Modernization Notes: SQL Server 2019 → 2025 (อัปเดตตาม Microsoft Learn)
+
+### 8.1 เครื่องมือทดสอบ I/O
+- **SQLIO ถูกยกเลิกแล้วทั้งหมด** — ใช้ **DiskSpd** (microsoft/diskspd) เป็นเครื่องมือมาตรฐานเดียว สอดคล้องกับ Lab ของ 10987C ที่แนบ DiskSpd 2.0.15 มาให้พร้อมใช้
+- ทางเลือกเสริมยุคใหม่: VM Fleet / storage benchmark ของ hardware vendor แต่หลักการตีความผล (IOPS vs Throughput vs Latency) เหมือนเดิม
+
+### 8.2 ฟีเจอร์ใหม่ที่กระทบ I/O Profile
+- **ZSTD backup compression (ใหม่ใน SQL Server 2025)** — อัลกอริทึมบีบอัด backup เร็วกว่าและได้อัตราดีกว่าเดิม ลดภาระ I/O ช่วง backup/restore อย่างมาก (ตั้งได้ผ่าน `BACKUP ... WITH COMPRESSION (ALGORITHM = ZSTD)`)
+- **tmpfs สำหรับ tempdb บน SQL Server on Linux (2025)** — วาง tempdb บน memory filesystem ได้
+- Instant File Initialization: ตั้งแต่ SQL Server 2022 log growth สูงสุด 64 MB ก็ได้ประโยชน์จาก IFI เช่นกัน (เดิมเฉพาะ data file)
+- **Hybrid Buffer Pool / PMEM** ยังคงมีบทบาทบนฮาร์ดแวร์ที่มี persistent memory
+
+### 8.3 การตีความค่า Latency (ยังคงเป็นเกณฑ์เดิม)
+| ประเภทไฟล์ | ดีเยี่ยม | ยอมรับได้ | แก้ด่วน |
+|:---|:---|:---|:---|
+| Data file (read) | < 5 ms | 5–20 ms | > 20 ms |
+| Data file (write) | < 5 ms | 5–20 ms | > 20 ms |
+| Log file (write) | < 2 ms | 2–5 ms | > 5 ms |
+
+> อ้างอิง: [DiskSpd](https://github.com/microsoft/diskspd), [What's new in SQL Server 2025](https://learn.microsoft.com/sql/sql-server/what-s-new-in-sql-server-2025), [sys.dm_io_virtual_file_stats](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-io-virtual-file-stats-transact-sql)

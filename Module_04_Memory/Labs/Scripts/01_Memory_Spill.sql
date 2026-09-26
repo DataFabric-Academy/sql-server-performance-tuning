@@ -11,10 +11,10 @@
 */
 
 -- Lab: Memory Spill Simulation
- USE AdventureWorks2022;
+ USE AdventureWorks2025;
  GO
  -- Ensure we are using a compat level that supports Feedback (140 = 2017, 150 = 2019, 160 = 2022)
- ALTER DATABASE AdventureWorks2022 SET COMPATIBILITY_LEVEL = 150; 
+ ALTER DATABASE AdventureWorks2025 SET COMPATIBILITY_LEVEL = 150; 
  GO
  
  -- Clean buffer/procedure cache to reset feedback
