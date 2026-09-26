@@ -200,8 +200,8 @@ WHERE name = DB_NAME();
 นอกจาก Lock ที่ใช้ปกป้องข้อมูลของผู้ใช้แล้ว SQL Server ยังมีกลไกอื่นๆ ที่ใช้ประสานงานภายใน Engine เพื่อป้องกันไม่ให้หลาย Thread เข้าถึงโครงสร้างข้อมูลเดียวกันพร้อมกัน
 
 **🏠 เปรียบเทียบกับบ้าน:**
-- **Lock** = กุญแจห้องนอน (ปกป้องข้าวของ = Data) - กุม Lock นาน รอได้
-- **Latch** = กุญแจตู้เย็น (ปกป้องอาหารชั่วคราว = Buffer Pages) - กุมสั้น ปล่อยเร็ว
+- **Lock** = กุญแจห้องนอน (ปกป้องข้าวของ = Data) - ถือ Lock ค้างไว้จน COMMIT/ROLLBACK
+- **Latch** = กุญแจตู้เย็น (ปกป้องอาหารชั่วคราว = Buffer Pages) - ถือสั้น ปล่อยเร็ว
 - **Spinlock** = กุญแจเครื่องชงกาแฟ (ใช้แป๊บเดียว = Internal Structures) - ยืนรอหมุนตัวตรงนั้น
 
 **ทำไมต้องมีหลายระดับ?**
@@ -427,7 +427,7 @@ Read Committed (แบบ Pessimistic ซึ่งใช้ Shared Lock ใน�
 
 ### 8.1 Optimized Locking (ฟีเจอร์ใหม่ใน SQL Server 2025)
 - **TID Locking**: เมื่อเปิดใช้ จะไม่ถือ row/page locks จนจบ transaction ใน READ COMMITTED — เหลือ lock เดียวคือ **Transaction ID (TID) lock** ลด lock memory และโอกาส lock escalation มาก
-- **Lock After Qualification (LAQ)**: ตรวจ predicate บน row เวอร์ชันล่าสุดที่ committed **โดยไม่ต้องกุม U lock** ทำให้ concurrency ดีขึ้น (ทำงานเมื่อเปิด RCSI)
+- **Lock After Qualification (LAQ)**: ตรวจ predicate บน row เวอร์ชันล่าสุดที่ committed **โดยไม่ต้องถือ U Lock** ทำให้ concurrency ดีขึ้น (ทำงานเมื่อเปิด RCSI)
 - สถานะ: **ปิด default ใน SQL Server 2025** (ต่างจาก Azure SQL DB ที่เปิดให้ DB ใหม่) — เปิดด้วย:
   ```sql
   -- ต้องเปิด ADR ก่อน และแนะนำเปิด RCSI คู่กัน

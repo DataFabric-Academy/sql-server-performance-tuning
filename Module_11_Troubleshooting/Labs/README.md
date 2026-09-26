@@ -26,7 +26,7 @@
 ### Step 1 — รัน chaos script ใน 4 หน้าต่างพร้อมกัน
 
 ```sql
--- หน้าต่าง 1: Blocking (transaction ค้างกุม lock)
+-- หน้าต่าง 1: Blocking (transaction ค้างถือ Lock อยู่)
 USE AdventureWorks2025;
 BEGIN TRAN;
 UPDATE Production.ProductInventory SET Quantity = Quantity + 1
