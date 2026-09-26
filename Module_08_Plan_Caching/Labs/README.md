@@ -186,4 +186,4 @@ DROP INDEX IF EXISTS IX_SalesOrderHeader_CustomerID_OrderDate ON Sales.SalesOrde
 
 - 10987C Lab08 — `Trainer_Docs/10987/Labfiles/Lab08/`
 - Microsoft Learn: [Query Store](https://learn.microsoft.com/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store) · [Query Store hints + ABORT_QUERY_EXECUTION](https://learn.microsoft.com/sql/relational-databases/performance/query-store-hints-best-practices) · [Automatic tuning](https://learn.microsoft.com/sql/relational-databases/automatic-tuning/automatic-tuning)
-- สคริปต์เสริมในโมดูล: `Scripts/02_Query_Store_Regression_Lab.sql`
+- ไฟล์ประกอบทั้งหมดอยู่ใน `Scripts/` ของโฟลเดอร์นี้ (`Scripts/01–03`) — โค้ดหลักของทุก Exercise ฝังอยู่ใน README ฉบับนี้แล้ว

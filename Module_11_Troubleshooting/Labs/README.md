@@ -197,4 +197,4 @@ EXEC dbo.CaptureBaselineSnapshot;   -- เก็บ baseline ปิดท้า�
 - 10987C Demofiles/Labfiles (ทุกโมดูล) — `Trainer_Docs/10987/`
 - Microsoft Learn: [Monitor with DMVs](https://learn.microsoft.com/sql/relational-databases/performance/monitor-sql-server-with-dynamic-management-views) · [Performance Dashboard](https://learn.microsoft.com/sql/tools/performance-dashboard) · [What's new in SQL Server 2025](https://learn.microsoft.com/sql/sql-server/what-s-new-in-sql-server-2025)
 - Glenn Berry: [SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
-- สคริปต์เสริมในโมดูล: `Labs/Scripts/01_Chaos_Generator.sql`, `Scripts/01_Server_Health_Check.sql`
+- ไฟล์ประกอบทั้งหมดอยู่ใน `Scripts/` ของโฟลเดอร์นี้ (`Scripts/01–07`) — โค้ดหลักของทุก Exercise ฝังอยู่ใน README ฉบับนี้แล้ว

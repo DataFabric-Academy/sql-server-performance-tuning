@@ -37,8 +37,8 @@
 
 ### Step 3: Check SQL Server Internals (Wait Statistics Analysis)
 หาก Server Resource ปกติ แต่ SQL Server ตอบสนองช้า จำเป็นต้องวิเคราะห์ **Wait Statistics**:
-*   *Overview*: ใช้ Script วิเคราะห์ Wait Stats สะสมเพื่อดูภาพรวม (`02_Wait_Stats_Analysis.sql`)
-*   *Real-time*: ตรวจสอบ Request ที่กำลังทำงานและการ Blocking ปัจจุบัน (`03_Current_Executing_Requests.sql`)
+*   *Overview*: ใช้ Script วิเคราะห์ Wait Stats สะสมเพื่อดูภาพรวม (`Module_01/Labs/Scripts/08_Wait_Stats_Analysis.sql`)
+*   *Real-time*: ตรวจสอบ Request ที่กำลังทำงานและการ Blocking ปัจจุบัน (โค้ดอยู่ใน Module 01 — Lab Exercise 3)
 
 ### Step 4: Identify the Root Cause
 จำแนกประเภทของปัญหา:
@@ -81,7 +81,7 @@ flowchart TD
 
 ### Scenario A: High CPU Utilization
 *   *Potential Cause*: มักเกิดจาก Table Scan, Index Scan ขนาดใหญ่, Compilation ภาระสูง (Plan Bloat), หรือ Spinlock Contention
-*   *Investigation*: ใช้ `01_Top_CPU_Queries.sql` เพื่อหา Query ที่ใช้ CPU สูงสุด
+*   *Investigation*: ใช้ `Module_07/Labs/Scripts/06_Top_CPU_Queries.sql` เพื่อหา Query ที่ใช้ CPU สูงสุด
 *   *Resolution*: ปรับปรุง Query (Tuning), สร้าง Index เพื่อเปลี่ยน Scan เป็น Seek, หรือปรับ Plan Cache Configuration
 
 ### Scenario B: High Blocking/Deadlocks

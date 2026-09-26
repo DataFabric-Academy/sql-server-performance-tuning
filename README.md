@@ -64,16 +64,13 @@
 
 ### โครงสร้างโฟลเดอร์
 
-แต่ละ Module จะแบ่งออกเป็น 2 โฟลเดอร์:
+ทุกสคริปต์สำหรับผู้เรียนอยู่ที่เดียว (ไม่ต้องเปิดสองที่):
 
 ```
 Module_XX_Topic/
-├── Scripts/              # 📺 Demo Scripts (สำหรับสาธิตแนวคิด)
-│   ├── 00_Workload_*.sql  # Workload scripts สำหรับสร้างโหลด
-│   └── README_Workload.md # คำแนะนำการใช้งาน Workload
 └── Labs/
-    ├── README.md          # 📝 คำแนะนำแล็บ
-    └── Scripts/          # 🧪 Lab Scripts (แบบฝึกหัดสำหรับผู้เรียน)
+    ├── README.md          # 📝 คู่มือ Lab แบบ Instruction + Code block (ครบในตัว)
+    └── Scripts/           # 🧪 ไฟล์ประกอบ Lab: workload generators + สคริปต์วิเคราะห์เชิงลึก
 ```
 
 ### Prerequisites
@@ -99,7 +96,7 @@ Module_XX_Topic/
 
 3. **Verify Setup**
    - ตรวจสอบความพร้อมของระบบก่อนเริ่มเรียน
-   - (หากมี) รัน `00_Master_Verification.sql`
+   - ตรวจความพร้อมด้วย `Module_10_Monitoring_Tracing/Labs/Scripts/04_Daily_Health_Check.sql`
 
 4. **เริ่มเรียน**
    - เริ่มจาก Module 01 เพื่อเข้าใจพื้นฐาน
@@ -125,14 +122,11 @@ Module_XX_Topic/
 
 ## 🛠️ สคริปต์ที่ใช้ (Scripts Overview)
 
-### Demo Scripts (`Scripts/`)
-สคริปต์สำหรับสาธิตแนวคิดและเทคนิค โดยผู้สอนสามารถรันเพื่อแสดงผลลัพธ์ให้ผู้เรียนเห็น
+### Lab Scripts (`Labs/Scripts/`) — ที่เดียวสำหรับผู้เรียน
+ทุกสคริปต์รวมอยู่ในโฟลเดอร์เดียวต่อโมดูล คู่กับคู่มือ `Labs/README.md` แบบ Instruction + Code block
 
-- **Workload Scripts**: สร้างโหลดเพื่อให้ Demo Scripts แสดงผลลัพธ์ที่ชัดเจน
-- **Diagnostic Scripts**: วิเคราะห์สถานะและประสิทธิภาพของระบบ
-
-### Lab Scripts (`Labs/Scripts/`)
-แบบฝึกหัดสำหรับผู้เรียน เพื่อนำความรู้มาแก้ปัญหาจริง
+- **Workload Scripts** (`Workload_*.sql`): สร้างโหลดจำลอง (CPU / I/O / Blocking) เพื่อให้แล็บเห็นปัญหาจริง
+- **Diagnostic Scripts**: สคริปต์วิเคราะห์เชิงลึก (หลายไฟล์อ้างอิง Glenn Berry Diagnostic Queries)
 
 - **Hands-on Exercises**: ฝึกปฏิบัติตามสถานการณ์จริง
 - **Challenge Scripts**: ทดสอบความเข้าใจด้วยปัญหาที่ซับซ้อน

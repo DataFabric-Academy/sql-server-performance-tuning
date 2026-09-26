@@ -351,7 +351,7 @@ flowchart TB
         
         > [!TIP]
         > ดูประวัติการทำงานของ Resource Monitor ได้ด้วย Script:
-        > `Scripts\03_Resource_Monitor_Ring_Buffer.sql`
+        > `Labs/Scripts/04_Resource_Monitor_Ring_Buffer.sql`
 
 3.  **Dynamic Memory Management**:
 
@@ -528,7 +528,7 @@ END;
 4.  **Verify**: รัน Workload เดิมอีกครั้ง แล้วดูว่า Wait หายไปหรือไม่ (ถ้า RAM พอควรจะหายไป)
 
 ### Exercise 2: Buffer Usage Analysis
-*   ใช้ `01_Buffer_Usage_By_DB.sql` เพื่อดูว่าใครกินแรมไป
+*   ใช้ query ใน `Labs/README.md` (Exercise 2) เพื่อดูว่าใครกินแรมไป
 
 ---
 

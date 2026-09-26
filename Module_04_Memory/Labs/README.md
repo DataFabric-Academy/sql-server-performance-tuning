@@ -202,4 +202,4 @@ DROP TABLE IF EXISTS dbo.MO_Sessions;
 - 10987C Lab04 — `Trainer_Docs/10987/Labfiles/Lab04/`
 - Microsoft Learn: [sys.dm_os_buffer_descriptors](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-os-buffer-descriptors-transact-sql) · [Memory Grant Feedback](https://learn.microsoft.com/sql/relational-databases/performance/intelligent-query-processing-memory-grant-feedback)
 - Glenn Berry: [SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
-- สคริปต์เสริมในโมดูล: `Scripts/01_Buffer_Usage_By_DB.sql`, `Scripts/03_Memory_Clerks.sql`
+- ไฟล์ประกอบทั้งหมดอยู่ใน `Scripts/` ของโฟลเดอร์นี้ (`Scripts/01–04`) — โค้ดหลักของทุก Exercise ฝังอยู่ใน README ฉบับนี้แล้ว

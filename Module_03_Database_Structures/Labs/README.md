@@ -279,4 +279,4 @@ DROP TABLE IF EXISTS dbo.BadKeyTable, dbo.GoodKeyTable, dbo.LogBloat;
 - 10987C Lab03 — `Trainer_Docs/10987/Labfiles/Lab03/`
 - Microsoft Learn: [tempdb database](https://learn.microsoft.com/sql/relational-databases/databases/tempdb-database) · [sys.dm_db_log_info](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-db-log-info-transact-sql) · [ADR in tempdb (2025)](https://learn.microsoft.com/sql/relational-databases/accelerated-database-recovery-concepts)
 - Glenn Berry: [SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
-- สคริปต์เสริมในโมดูล: `Scripts/02_VLF_Analysis.sql`, `Scripts/03_TempDB_Configuration.sql`
+- ไฟล์ประกอบทั้งหมดอยู่ใน `Scripts/` ของโฟลเดอร์นี้ (`Scripts/01–05`) — โค้ดหลักของทุก Exercise ฝังอยู่ใน README ฉบับนี้แล้ว

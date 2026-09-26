@@ -225,4 +225,4 @@ ALTER DATABASE AdventureWorks2025 SET OPTIMIZED_LOCKING = OFF;  -- ตามต�
 - 10987C Lab05 — `Trainer_Docs/10987/Labfiles/Lab05/`
 - Microsoft Learn: [Optimized locking](https://learn.microsoft.com/sql/relational-databases/performance/optimized-locking) · [Row versioning guide](https://learn.microsoft.com/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide) · [ADR](https://learn.microsoft.com/sql/relational-databases/accelerated-database-recovery-concepts)
 - Glenn Berry: [SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
-- สคริปต์เสริมในโมดูล: `Labs/Scripts/01–08` (blocking/deadlock/snapshot/latch)
+- ไฟล์ประกอบทั้งหมดอยู่ใน `Scripts/` ของโฟลเดอร์นี้ (`Scripts/01–09`) — โค้ดหลักของทุก Exercise ฝังอยู่ใน README ฉบับนี้แล้ว

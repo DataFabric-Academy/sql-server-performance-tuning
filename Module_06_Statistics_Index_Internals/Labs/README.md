@@ -221,4 +221,4 @@ DROP TABLE IF EXISTS dbo.StatsTest;
 - 10987C Lab06 — `Trainer_Docs/10987/Labfiles/Lab06/`
 - Microsoft Learn: [Missing index DMVs](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-db-missing-index-details-transact-sql) · [Columnstore what's new (2025)](https://learn.microsoft.com/sql/relational-databases/indexes/columnstore-indexes-what-s-new) · [Persisted stats on secondaries (2025)](https://learn.microsoft.com/sql/relational-databases/performance/persisted-stats-secondary-replicas)
 - Glenn Berry: [SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
-- สคริปต์เสริมในโมดูล: `Scripts/01_Index_Fragmentation.sql`, `Scripts/02_Missing_Indexes.sql`
+- ไฟล์ประกอบทั้งหมดอยู่ใน `Scripts/` ของโฟลเดอร์นี้ (`Scripts/01–10`) — โค้ดหลักของทุก Exercise ฝังอยู่ใน README ฉบับนี้แล้ว

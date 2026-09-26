@@ -236,4 +236,4 @@ DBCC SQLPERF('sys.dm_os_wait_stats', CLEAR);
 - 10987C Lab01 (CPU and NUMA, Monitor Schedulers, Waits) — `Trainer_Docs/10987/Labfiles/Lab01/`
 - Microsoft Learn: [sys.dm_os_wait_stats](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql) · [sys.dm_os_schedulers](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-os-schedulers-transact-sql) · [Thread and Task Architecture Guide](https://learn.microsoft.com/sql/relational-databases/thread-and-task-architecture-guide)
 - Glenn Berry: [SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
-- สคริปต์เสริมในโมดูล: `Scripts/01_Check_Schedulers.sql`, `Scripts/02_Wait_Stats_Analysis.sql`, `Labs/Scripts/05_Wait_Stats_Deep_Dive.sql`
+- ไฟล์ประกอบทั้งหมดอยู่ใน `Scripts/` ของโฟลเดอร์นี้ (`Scripts/01–08`) — โค้ดหลักของทุก Exercise ฝังอยู่ใน README ฉบับนี้แล้ว

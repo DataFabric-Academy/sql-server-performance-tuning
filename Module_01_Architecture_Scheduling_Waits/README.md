@@ -256,10 +256,10 @@ $$ \text{Response Time} = \text{Service Time (CPU)} + \text{Wait Time} $$
 ---
 
 ## 5. Lab & Exercises
-สำหรับการทดลอง ให้ใช้สคริปต์ในโฟลเดอร์ `Scripts/`:
-1.  **วิเคราะห์ CPU Pressure**: รัน `01_Check_Schedulers.sql` ในขณะที่มี Workload หนัก ๆ ดูค่า `runnable_tasks_count`
-2.  **วิเคราะห์ภาพรวมระบบ**: รัน `02_Wait_Stats_Analysis.sql` เพื่อดู Top 3 ปัญหาหลักของ Server นี้
-3.  **Real-time Troubleshooting**: รัน `03_Current_Executing_Requests.sql` เพื่อดูว่าขณะนี้มีใครรันอะไร แล้วติด Wait อะไรอยู่
+สำหรับการทดลอง ให้ใช้สคริปต์ใน `Labs/Scripts/` (คู่มือฉบับเต็มอยู่ที่ [Labs/README.md](Labs/README.md)):
+1.  **วิเคราะห์ CPU Pressure**: รัน `Labs/Scripts/06_Workload_Active_Queries.sql` สร้างโหลด แล้วดูค่า `runnable_tasks_count` (โค้ดตรวจ scheduler อยู่ใน Lab Exercise 1)
+2.  **วิเคราะห์ภาพรวมระบบ**: รัน `Labs/Scripts/08_Wait_Stats_Analysis.sql` (Glenn Berry) เพื่อดู Top Waits ของ Server นี้
+3.  **Real-time Troubleshooting**: รัน `Labs/Scripts/07_Workload_Mixed_Waits.sql` แล้วดูว่าขณะนี้มีใครรันอะไร ติด Wait อะไรอยู่ (โค้ดใน Lab Exercise 3)
 
 > **Tip**: พยายามมองหา Pattern เช่น "ช้าทุกวันช่วง 9 โมง" (Baseline ช่วยได้) หรือ "ช้าเฉพาะ Procedure ตัวนี้" (Query Plan ช่วยได้)
 
