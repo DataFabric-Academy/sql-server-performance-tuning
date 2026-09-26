@@ -29,7 +29,7 @@
 ### 2.2 Physical vs Virtual Memory
 *   **Physical Memory**: หน่วยความจำหลัก (RAM)
 *   **Virtual Memory**: กลไกของ OS ที่ใช้ Disk (Page File) มาขยายพื้นที่หน่วยความจำ
-    *   *Paging*: กระบวนการย้ายหน้าข้อมูล (Pages) ระหว่าง RAM และ Disk
+    *   *Paging*: กระบวนการย้าย Data Pages ระหว่าง RAM และ Disk
     *   *Impact*: หาก Windows ทำการ Paging Process ของ SQL Server จะส่งผลกระทบต่อประสิทธิภาพอย่างรุนแรง (Performance Degradation)
 
 ### 2.3 NUMA (Non-Uniform Memory Access)

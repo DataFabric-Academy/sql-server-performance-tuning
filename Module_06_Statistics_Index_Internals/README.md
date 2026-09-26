@@ -1,7 +1,7 @@
 # Module 6: Statistics and Index Internals
 
 ## 1. บทนำ (Introduction)
-ดัชนี (Index) เปรียบเสมือนเครื่องมือช่วยค้นหาข้อมูลที่มีประสิทธิภาพสูงสุดในระบบฐานข้อมูล ปัญหาประสิทธิภาพส่วนใหญ่ (Performance Issues) มักเกิดจากการออกแบบ Index ที่ไม่เหมาะสม หรือขาด Index ที่จำเป็นสำหรับการตอบสนอง Query (SARGable Predicates)
+Index เปรียบเสมือนเครื่องมือช่วยค้นหาข้อมูลที่มีประสิทธิภาพสูงสุดในระบบฐานข้อมูล ปัญหาประสิทธิภาพส่วนใหญ่ (Performance Issues) มักเกิดจากการออกแบบ Index ที่ไม่เหมาะสม หรือขาด Index ที่จำเป็นสำหรับการตอบสนอง Query (SARGable Predicates)
 
 ในบทเรียนนี้ ผู้เรียนจะศึกษาโครงสร้างภายในของ Statistics, Index B-Tree, และ Columnstore Index
 
@@ -21,7 +21,7 @@
 
 ### 2.1 What are Statistics?
 
-**Statistics** คือ Object ที่ SQL Server สร้างขึ้นเพื่อเก็บข้อมูลสรุปเกี่ยวกับ **การกระจายตัว (Distribution)** ของข้อมูลในคอลัมน์ Query Optimizer ใช้ Statistics ในการตัดสินใจว่า:
+**Statistics** คือ Object ที่ SQL Server สร้างขึ้นเพื่อเก็บข้อมูลสรุปเกี่ยวกับ **การกระจายตัว (Distribution)** ของข้อมูลในColumn Query Optimizer ใช้ Statistics ในการตัดสินใจว่า:
 - Query นี้จะได้ข้อมูลประมาณกี่แถว? (**Cardinality Estimation**)
 - ควรใช้ Index Seek หรือ Index Scan?
 - ควรใช้ Join Algorithm แบบไหน? (Nested Loop / Hash / Merge)
@@ -33,7 +33,7 @@
 | Component | หน้าที่ | ใช้เมื่อไร |
 |-----------|-------|----------|
 | **Header** | Metadata: เวลา Update ล่าสุด, Rows Sampled | ตรวจสอบความเก่า |
-| **Density Vector** | ค่า 1/Distinct Values ของคอลัมน์ | GROUP BY, Multi-column Join |
+| **Density Vector** | ค่า 1/Distinct Values ของColumn | GROUP BY, Multi-column Join |
 | **Histogram** | กราฟกระจายข้อมูล (สูงสุด 200 Steps) | WHERE clause, Range Query |
 
 **Histogram Columns:**
@@ -57,7 +57,7 @@ Query Optimizer ทำงานแบบ Cost-Based คือการค้น�
 
 | Assumption | Legacy CE (< 2014) | New CE (2014+) |
 |------------|-------------------|----------------|
-| **Independence** | คอลัมน์อิสระต่อกัน | เข้าใจ Correlation ระหว่างคอลัมน์ |
+| **Independence** | Columnอิสระต่อกัน | เข้าใจ Correlation ระหว่างColumn |
 | **Uniformity** | ค่ากระจายสม่ำเสมอ | รองรับ Skewed Data |
 | **Containment** | ค้นหาข้อมูลที่มีอยู่เท่านั้น | รองรับ Data ที่ไม่มี |
 | **Ascending Key** | ไม่เข้าใจ | เข้าใจว่า Max อาจ > Statistics |
@@ -147,7 +147,7 @@ EXEC sp_query_store_set_hints @query_id = 123,
     *   **OLTP**: เน้น **Narrow Index** (Column น้อยๆ) เพื่อลด Overhead ตอน Insert/Update และพิจารณา *Memory-Optimized Tables* หากต้องการ Throughput สูงจัด
     *   **OLAP**: พิจารณาใช้ **Columnstore Index** เสมอสำหรับ Fact Table ขนาดใหญ่
 2.  **Sort Order (ASC/DESC)**:
-    *   การระบุ `ASC` หรือ `DESC` ใน Index Key มีผลเมื่อ Query มีการ `ORDER BY` หลายคอลัมน์ในทิศทางต่างกัน
+    *   การระบุ `ASC` หรือ `DESC` ใน Index Key มีผลเมื่อ Query มีการ `ORDER BY` หลายColumnในทิศทางต่างกัน
     *   *Example*: `ORDER BY Col1 ASC, Col2 DESC` -> ควรสร้าง Index `(Col1 ASC, Col2 DESC)` เพื่อกำจัด **Sort Operator** (ราคาแพง) ออกจาก Plan
     *   *Note*: SQL Server สามารถอ่าน Index ย้อนกลับได้ (Bi-directional) ดังนั้น Index `ASC` สามารถรองรับ `ORDER BY DESC` ได้ (ถ้าทิศทางเหมือนกันทั้ง Index)
 3.  **Operation Options**:
@@ -157,11 +157,11 @@ EXEC sp_query_store_set_hints @query_id = 123,
 ---
 
 ## 4. Columnstore Indexes (Lesson 3)
-เทคโนโลยีการจัดเก็บข้อมูลแบบคอลัมน์ (Columnar Storage) ออกแบบมาเพื่อเพิ่มประสิทธิภาพสำหรับ Data Warehouse และ Analytical Workloads
+เทคโนโลยีการจัดเก็บข้อมูลแบบColumn (Columnar Storage) ออกแบบมาเพื่อเพิ่มประสิทธิภาพสำหรับ Data Warehouse และ Analytical Workloads
 
 ### 4.1 Architecture
-*   **Column-oriented**: การจัดเก็บข้อมูลแยกตามคอลัมน์ ทำให้สามารถอ่านเฉพาะข้อมูลที่จำเป็นต้องใช้ (ลด I/O)
-*   **High Compression**: อัตราการบีบอัดสูง (10x - 100x) เนื่องจากข้อมูลในคอลัมน์เดียวกันมักมีความคล้ายคลึงกัน
+*   **Column-oriented**: การจัดเก็บข้อมูลแยกตามColumn ทำให้สามารถอ่านเฉพาะข้อมูลที่จำเป็นต้องใช้ (ลด I/O)
+*   **High Compression**: อัตราการบีบอัดสูง (10x - 100x) เนื่องจากข้อมูลในColumnเดียวกันมักมีความคล้ายคลึงกัน
 *   **Batch Mode Processing**: การประมวลผลข้อมูลเป็นชุด (Vector-based, ~900 rows/batch) แทนการประมวลผลทีละแถว ซึ่งเพิ่มประสิทธิภาพ CPU อย่างมาก
 *   *Types*:
     *   **Clustered Columnstore Index (CCI)**: ใช้เป็นพื้นที่จัดเก็บหลักของตาราง (Primary Storage)
@@ -169,7 +169,7 @@ EXEC sp_query_store_set_hints @query_id = 123,
 
 ### 4.2 Columnstore Internals
 *   **Rowgroup**: หน่วยการจัดเก็บข้อมูล (Logical Group) รองรับสูงสุดประมาณ 1 ล้านแถวต่อ Rowgroup
-*   **Segment**: ข้อมูลของหนึ่งคอลัมน์ภายใน Rowgroup (เป็นหน่วยในการอ่านจาก Disk)
+*   **Segment**: ข้อมูลของหนึ่งColumnภายใน Rowgroup (เป็นหน่วยในการอ่านจาก Disk)
 *   **Dictionary Encoding**: เทคนิคการบีบอัดโดยการแทนที่ค่าซ้ำด้วย Reference ID
 *   **Deltastore**: พื้นที่ชั่วคราว (Rowstore) สำหรับรองรับการ Insert/Update ข้อมูลจำนวนน้อย ก่อนที่จะถูกบีบอัดรวมเข้าสู่ Rowgroup
 *   **Tuple Mover**: Background Process ที่ทำหน้าที่ย้ายข้อมูลจาก Deltastore เข้าสู่ Compressed Rowgroup

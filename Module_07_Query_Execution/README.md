@@ -147,7 +147,7 @@ WHERE session_id = <target_session_id>;
 *   **Hash Join**: เหมาะสำหรับ Input ขนาดใหญ่ที่ไม่มีการเรียงลำดับ (ต้องใช้ Memory ในการสร้าง Hash Table)
 
 ### 4.3 Warnings
-*   **Missing Statistics**: Optimizer ขาดข้อมูลสถิติในการประเมิน Cost
+*   **Missing Statistics**: Optimizer ขาด Statistics ในการประเมิน Cost
 *   **Missing Index**: คำแนะนำให้สร้าง Index เพิ่มเติมเพื่อลด I/O Cost
 *   **Implicit Conversion**: การแปลง Data Type อัตโนมัติซึ่งอาจปิดกั้นการใช้ Index (Prevent Index Seek)
 *   **Spill Warning**: Memory Grant ไม่เพียงพอ ทำให้ต้องเขียนข้อมูลชั่วคราวลง TempDB (ส่งผลกระทบต่อประสิทธิภาพสูง)
@@ -237,7 +237,7 @@ ALTER DATABASE [YourDB] SET COMPATIBILITY_LEVEL = 170;
 *   *Note*: Minimum DOP คือ 2 (ไม่ลดจนเป็น Serial) และเพิกเฉยต่อ Waits ภายนอกเช่น Buffer Latch, Network I/O
 
 **9. CE (Cardinality Estimation) Feedback (SQL 2022+)**
-*   *Problem*: CE Model ที่ใช้อาจไม่เหมาะกับข้อมูล (เช่น คาดว่าคอลัมน์สัมพันธ์กันแต่จริงๆ อิสระต่อกัน)
+*   *Problem*: CE Model ที่ใช้อาจไม่เหมาะกับข้อมูล (เช่น คาดว่าColumnสัมพันธ์กันแต่จริงๆ อิสระต่อกัน)
 *   *Mechanism*: ตรวจสอบผลลัพธ์จริงเทียบกับที่เดาไว้ (Actual vs Estimated Rows)
 *   *Adjustment*: ทดลองเปลี่ยนสมมติฐาน (Model Assumption) ผ่าน **Query Store Hints** เช่น `ASSUME_MIN_SELECTIVITY_FOR_FILTER_ESTIMATES`
 *   *Scenarios*: ปรับเรื่อง Correlation (Independence vs Full Correlation) และ Join Containment
@@ -296,6 +296,6 @@ Logical Reads คือการอ่านจาก Memory (Buffer Pool) ซ�
   ```sql
   ALTER DATABASE AdventureWorks2025 SET COMPATIBILITY_LEVEL = 170;
   ```
-- ใช้ `sys.query_store_plan` คอลัมน์ `has_compile_replay_script` / XEvent ของ IQP ติดตามการทำงานของ feedback
+- ใช้ `sys.query_store_plan` Column `has_compile_replay_script` / XEvent ของ IQP ติดตามการทำงานของ feedback
 
 > อ้างอิง: [Intelligent Query Processing](https://learn.microsoft.com/sql/relational-databases/performance/intelligent-query-processing), [What's new in SQL Server 2025 — Query Store and IQP](https://learn.microsoft.com/sql/sql-server/what-s-new-in-sql-server-2025)

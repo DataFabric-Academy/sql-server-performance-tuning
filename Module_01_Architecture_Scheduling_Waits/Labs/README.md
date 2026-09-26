@@ -227,7 +227,7 @@ WHERE session_id <> @@SPID;
 ## Cleanup
 
 ```sql
--- Reset wait stats (ทำเฉพาะบน VM ทดสอบ — ห้ามรันบน Production เพราะสถิติสะสมจะหาย)
+-- Reset wait stats (ทำเฉพาะบน VM ทดสอบ — ห้ามรันบน Production เพราะค่าสะสมจะหาย)
 DBCC SQLPERF('sys.dm_os_wait_stats', CLEAR);
 ```
 

@@ -200,8 +200,8 @@ WHERE name = DB_NAME();
 นอกจาก Lock ที่ใช้ปกป้องข้อมูลของผู้ใช้แล้ว SQL Server ยังมีกลไกอื่นๆ ที่ใช้ประสานงานภายใน Engine เพื่อป้องกันไม่ให้หลาย Thread เข้าถึงโครงสร้างข้อมูลเดียวกันพร้อมกัน
 
 **🏠 เปรียบเทียบกับบ้าน:**
-- **Lock** = กุญแจห้องนอน (ปกป้องข้าวของ = Data) - ล็อกนาน รอได้
-- **Latch** = กุญแจตู้เย็น (ปกป้องอาหารชั่วคราว = Buffer Pages) - ล็อกสั้น ไม่รอนาน
+- **Lock** = กุญแจห้องนอน (ปกป้องข้าวของ = Data) - กุม Lock นาน รอได้
+- **Latch** = กุญแจตู้เย็น (ปกป้องอาหารชั่วคราว = Buffer Pages) - กุมสั้น ปล่อยเร็ว
 - **Spinlock** = กุญแจเครื่องชงกาแฟ (ใช้แป๊บเดียว = Internal Structures) - ยืนรอหมุนตัวตรงนั้น
 
 **ทำไมต้องมีหลายระดับ?**
@@ -212,7 +212,7 @@ WHERE name = DB_NAME();
 | Type | ใช้ปกป้องอะไร | เมื่อต้องรอ | ถือนานแค่ไหน | Wait Type |
 |:-----|:--------------|:------------|:-------------|:----------|
 | 🔒 **Lock** | ข้อมูลผู้ใช้ (Row, Page, Table) | Thread นอนรอ (Blocking) | นาน (ตลอด Transaction) | `LCK_M_*` |
-| 🔐 **Latch** | หน้าข้อมูลใน Memory (Buffer Pool) | Thread นอนรอ (Blocking) | สั้น | `PAGELATCH_*` |
+| 🔐 **Latch** | Data Page ใน Memory (Buffer Pool) | Thread นอนรอ (Blocking) | สั้น | `PAGELATCH_*` |
 | ⚙️ **Spinlock** | โครงสร้างภายใน Engine | Thread วนลูป (Spinning) | สั้นมาก | ไม่มี (ใช้ CPU วนลูป) |
 
 #### Latch Types
@@ -412,7 +412,7 @@ Read Committed (แบบ Pessimistic ซึ่งใช้ Shared Lock ใน�
 
 <details>
 <summary><b>2. Lock Escalation คืออะไร และทำไม SQL Server ถึงทำ?</b></summary>
-คือการเปลี่ยนจาก Lock แถว (Row) เป็น Lock โต๊ะ (Table) เมื่อมีการ Lock มากเกินไป (เกิน 5,000) เพื่อประหยัด Memory แต่อาจทำให้คนอื่นใช้งาน Table นั้นไม่ได้เลย
+คือการเปลี่ยนจาก Row Lock เป็น Table Lock เมื่อมีการ Lock มากเกินไป (เกิน 5,000) เพื่อประหยัด Memory แต่อาจทำให้คนอื่นใช้งาน Table นั้นไม่ได้เลย
 </details>
 
 <details>

@@ -170,7 +170,7 @@ TempDB เป็น Global Resource ที่ใช้งานร่วมก�
 เมื่อหลาย Session พยายามสร้าง Temp Table พร้อมกัน SQL Server ต้องอัปเดต "แผนที่" ของ Database (Allocation Pages) ซึ่งอยู่บน Page เดียวกัน ทำให้เกิดการ "แย่งกันเขียน" หน้าเดียวกัน
 
 **PAGELATCH Contention คืออะไร?**
-- **Latch** = กลไกล็อกภายในที่ปกป้องหน้าข้อมูลขณะอ่าน/เขียน Memory
+- **Latch** = กลไก Lock ภายในที่ปกป้อง Data Page ขณะอ่าน/เขียน Memory
 - เมื่อ Thread หลายตัวต้องการเขียน Page เดียวกัน → ต้องรอ Latch → เกิด Wait Type `PAGELATCH_EX` หรือ `PAGELATCH_UP`
 - ใน TempDB ปัญหานี้มักเกิดที่ **PFS/GAM/SGAM Pages** (Allocation Bitmaps)
 
@@ -191,7 +191,7 @@ Transaction Log File ถูกแบ่งโครงสร้างภาย�
 
 ### 5.2 Ghost Cleanup Process
 
-**Ghost Records** คือแถวข้อมูลที่ถูก DELETE แล้วแต่ยังไม่ถูกลบออกจาก Page จริงๆ:
+**Ghost Records** คือData Row ที่ถูก DELETE แล้วแต่ยังไม่ถูกลบออกจาก Page จริงๆ:
 
 *   **ทำไมต้องมี Ghost?**: เพื่อเพิ่มประสิทธิภาพการ DELETE และรองรับ Row-level Locking / Snapshot Isolation
 *   **Mechanism**: เมื่อ DELETE จะเปลี่ยน Bit ใน Row Header เป็น "Ghost" แทนการลบทันที

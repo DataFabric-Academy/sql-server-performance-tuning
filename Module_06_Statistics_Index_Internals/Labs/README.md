@@ -108,7 +108,7 @@ ORDER BY total_reads ASC, total_writes DESC;
 
 ✅ **เกณฑ์ตัดสินใจ**: `total_reads = 0` แต่ `total_writes` สูง → ผู้สมัครถูก DROP (ยืนยันว่าไม่ใช่ PK/Unique constraint และไม่ใช่ index ที่ batch รายเดือนใช้ — ต้องมี baseline ยาว ≥ 1 business cycle)
 
-### Step 2 — หา duplicate index (คอลัมน์ key ซ้ำกัน)
+### Step 2 — หา duplicate index (Column key ซ้ำกัน)
 
 ```sql
 SELECT OBJECT_SCHEMA_NAME(object_id) + '.' + OBJECT_NAME(object_id) AS table_name,

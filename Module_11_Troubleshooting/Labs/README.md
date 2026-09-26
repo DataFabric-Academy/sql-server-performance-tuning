@@ -163,7 +163,7 @@ WHERE blocking_session_id <> 0;
 |:-----------|:--------------------------|
 | Transaction เปิดค้างจาก app/SSMS | ตรวจ app connection pool timeout, สอน pattern BEGIN TRAN–COMMIT สั้น, เปิด XEvent `blocked_process_report` + `blocked process threshold = 5` |
 | CPU query หนัก | ตรวจ plan (index ขาด?), DOP/CTFP, Query Store force plan |
-| Result set ยักษ์สู่ client | แก้ query ฝั่ง app (เลือกคอลัมน์/แบ่งหน้า) — ASYNC_NETWORK_IO |
+| Result set ยักษ์สู่ client | แก้ query ฝั่ง app (เลือกColumn/แบ่งหน้า) — ASYNC_NETWORK_IO |
 | Sort ใหญ่ + spill | เพิ่ม index ลด sort, Memory Grant Feedback, ตรวจ stats |
 
 ### Step 4 (Optional) — ตรวจด้วย XEvents ตอนกลับมามีปัญหาอีก

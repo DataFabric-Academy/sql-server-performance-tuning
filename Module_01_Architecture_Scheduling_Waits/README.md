@@ -121,7 +121,7 @@ sequenceDiagram
 
 **Lock/Blocking-Related Waits:**
 
-Lock คือกลไกที่ป้องกันไม่ให้หลาย Transaction แก้ไขข้อมูลเดียวกันพร้อมกัน ส่วน Latch คือกลไกภายในที่ปกป้องหน้าข้อมูลใน Memory (ดูรายละเอียดใน Module 05)
+Lock คือกลไกที่ป้องกันไม่ให้หลาย Transaction แก้ไขข้อมูลเดียวกันพร้อมกัน ส่วน Latch คือกลไกภายในที่ปกป้อง Data Page ใน Memory (ดูรายละเอียดใน Module 05)
 
 *   **LCK_M_\***: รอ Lock บนข้อมูล (S=Shared อ่าน, X=Exclusive เขียน, U=Update กำลังจะเขียน)
 *   **PAGELATCH_\***: รอ Latch บน Buffer Pool pages - เมื่อหลาย Thread พยายามเข้าถึงหน้าเดียวกันใน Memory (มักเกิดกับ TempDB Allocation Pages)
@@ -155,8 +155,8 @@ Lock คือกลไกที่ป้องกันไม่ให้หล
 | DMV | Purpose | Best Used For |
 |:-----|:--------|:--------------|
 | `sys.dm_os_waiting_tasks` | แสดง Tasks ที่กำลัง **รอ** ทรัพยากร (SUSPENDED state) | 🔍 Real-time Blocking Analysis |
-| `sys.dm_os_wait_stats` | สถิติรวมของ Wait Types ทั้ง Server | 📊 Cumulative Wait Analysis |
-| `sys.dm_exec_query_stats` | สถิติของ Query Plans ใน Cache | 📈 Historical Query Performance |
+| `sys.dm_os_wait_stats` | ค่ารวมของ Wait Types ทั้ง Server (Cumulative) | 📊 Cumulative Wait Analysis |
+| `sys.dm_exec_query_stats` | ค่ารวมของ Query Plans ใน Cache | 📈 Historical Query Performance |
 
 > [!TIP]
 > **เลือก DMV ที่เหมาะสม:**
