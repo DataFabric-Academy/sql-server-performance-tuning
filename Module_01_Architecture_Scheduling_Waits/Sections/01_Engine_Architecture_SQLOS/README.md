@@ -14,7 +14,7 @@ Section นี้วางแผนที่นั้นให้ — เมื�
 
 ## แผนภาพการทำงานของ SQL Server Database Engine
 
-![SQL Server Database Engine Architecture](images/engine-architecture.png)
+![การทำงานของ SQL Server Database Engine](images/engine-architecture.png)
 
 แผนภาพนี้คือ **แผนที่หลักของทั้งหลักสูตร** — ทุก Module จะซูมเข้าไปดูทีละส่วน:
 
@@ -87,6 +87,7 @@ Query เข้ามา → มี Plan อยู่ใน Plan Cache หรื
 | **Buffer Manager** | ตัดสินใจว่า page อยู่ใน Buffer Pool หรือต้องอ่านจาก disk | Data Cache |
 | **Page Manager** | อ่าน/เขียน page (8 KB) จริง ๆ กับ Data Files | Data Files |
 | **Transaction Manager** | ควบคุม Atomicity + เขียน Log ตามหลัก Write-Ahead Logging | Transaction Log File |
+| **Log Cache → Log Writer** | พัก log records ใน memory ก่อนเขียนลง disk | Transaction Log (.ldf) |
 | **Lock Manager** | บริหาร Locks ให้ transaction ไม่เหยียบกัน | Lock structures |
 
 - **Logical Read** = อ่านจาก Data Cache | **Physical Read** = ต้องอ่านจาก Data Files จริง
@@ -126,7 +127,7 @@ ORDER BY Total DESC;
    - ครั้งถัดไป → ใช่ → **หา Plan จาก Plan Cache** มาใช้เลย
 4. **Query Executor** — รับ plan สั่งงาน **Access Methods**
 5. **Buffer Manager / Page Manager** — ขอ data pages: ถ้าอยู่ใน **Data Cache** → Logical Read; ไม่มี → อ่านจาก **Data Files**
-6. **Transaction Manager / Lock Manager** — คุมความถูกต้องและกันเหยียบกันระหว่างรัน
+6. **Transaction Manager / Lock Manager** — คุมความถูกต้องและกันเหยียบกันระหว่างรัน · log records เข้า **Log Cache** ก่อนที่ **Log Writer** จะเขียนลง Transaction Log (.ldf) — ตามหลัก WAL: log ต้อง harden ก่อน dirty pages ถูก flush
 7. **SQLOS layer** — ตลอดเวลาที่ทำงาน Thread Scheduling แบ่ง CPU, Memory Management ดูแล memory ให้
 8. **Results** — ส่งกลับ client; ถ้า client รับช้า → `ASYNC_NETWORK_IO`
 
