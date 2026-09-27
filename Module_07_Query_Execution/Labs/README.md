@@ -190,4 +190,4 @@ DROP PROCEDURE IF EXISTS dbo.usp_SearchOrders;
 - 10987C Lab07 — `Trainer_Docs/10987/Labfiles/Lab07/`
 - Microsoft Learn: [IQP](https://learn.microsoft.com/sql/relational-databases/performance/intelligent-query-processing) · [Optional parameter optimization (2025)](https://learn.microsoft.com/sql/relational-databases/performance/optional-parameter-optimization) · [CE feedback for expressions (2025)](https://learn.microsoft.com/sql/relational-databases/performance/intelligent-query-processing-ce-feedback-for-expressions)
 - Glenn Berry: [SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
-- ไฟล์ประกอบทั้งหมดอยู่ใน `Scripts/` ของโฟลเดอร์นี้ (`Scripts/01–07`) — โค้ดหลักของทุก Exercise ฝังอยู่ใน README ฉบับนี้แล้ว
+- สคริปต์ของแล็บนี้อยู่ใน `Sections/*/Scripts/` ของโมดูล จัดตามหัวข้อที่เกี่ยวข้อง (ลิงก์ในแต่ละ Exercise)

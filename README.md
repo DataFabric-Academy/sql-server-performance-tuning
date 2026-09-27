@@ -64,13 +64,18 @@
 
 ### โครงสร้างโฟลเดอร์
 
-ทุกสคริปต์สำหรับผู้เรียนอยู่ที่เดียว (ไม่ต้องเปิดสองที่):
+อ่านเป็นลำดับเหมือนหนังสือ — แต่ละโมดูลแบ่งเป็น Sections ย่อย สคริปต์อยู่กับหัวข้อที่เกี่ยวข้อง:
 
 ```
 Module_XX_Topic/
+├── README.md                     # 📖 สารบัญโมดูล: บทนำ + สารบัญ Sections + Quiz
+├── Sections/
+│   ├── 01_Topic_Name/
+│   │   ├── README.md             # 📖 เนื้อหาบทเรียนแบบหนังสือ
+│   │   └── Scripts/              # 🧪 สคริปต์ที่เกี่ยวข้องกับ section นี้
+│   ├── 02_Topic_Name/ ...
 └── Labs/
-    ├── README.md          # 📝 คู่มือ Lab แบบ Instruction + Code block (ครบในตัว)
-    └── Scripts/           # 🧪 ไฟล์ประกอบ Lab: workload generators + สคริปต์วิเคราะห์เชิงลึก
+    └── README.md                 # 🧪 แล็บรวมประจำโมดูล (Instruction + Code block)
 ```
 
 ### Prerequisites
@@ -122,11 +127,12 @@ Module_XX_Topic/
 
 ## 🛠️ สคริปต์ที่ใช้ (Scripts Overview)
 
-### Lab Scripts (`Labs/Scripts/`) — ที่เดียวสำหรับผู้เรียน
-ทุกสคริปต์รวมอยู่ในโฟลเดอร์เดียวต่อโมดูล คู่กับคู่มือ `Labs/README.md` แบบ Instruction + Code block
+### Section Scripts (`Sections/*/Scripts/`)
+สคริปต์อยู่คู่กับหัวข้อที่เกี่ยวข้อง — เปิด section ไหนก็เจอสคริปต์ของหัวข้อนั้น
 
 - **Workload Scripts** (`Workload_*.sql`): สร้างโหลดจำลอง (CPU / I/O / Blocking) เพื่อให้แล็บเห็นปัญหาจริง
 - **Diagnostic Scripts**: สคริปต์วิเคราะห์เชิงลึก (หลายไฟล์อ้างอิง Glenn Berry Diagnostic Queries)
+- คู่มือแล็บรวมต่อโมดูล: `Labs/README.md` แบบ Instruction + Code block
 
 - **Hands-on Exercises**: ฝึกปฏิบัติตามสถานการณ์จริง
 - **Challenge Scripts**: ทดสอบความเข้าใจด้วยปัญหาที่ซับซ้อน

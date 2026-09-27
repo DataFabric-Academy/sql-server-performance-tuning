@@ -92,7 +92,7 @@ SET STATISTICS TIME OFF;
 GO
 ```
 
-> แต่ละ statement ใส่ 1 แถว; `GO 5` รันซ้ำ 5 ครั้ง — ใช้ได้กับ default 1 แถว เพื่อความเร็วของแล็บ ผู้สอนอาจสาธิตด้วยลูป 10,000 แถวในสคริปต์ `Labs/Scripts/01_Bad_vs_Good_Structure.sql`
+> แต่ละ statement ใส่ 1 แถว; `GO 5` รันซ้ำ 5 ครั้ง — ใช้ได้กับ default 1 แถว เพื่อความเร็วของแล็บ ผู้สอนอาจสาธิตด้วยลูป 10,000 แถวในสคริปต์ `Labs/../../Sections/01_Structure_Internals/Scripts/01_Bad_vs_Good_Structure.sql`
 
 ### Step 3 — เทียบ fragmentation และ page count
 
@@ -279,4 +279,4 @@ DROP TABLE IF EXISTS dbo.BadKeyTable, dbo.GoodKeyTable, dbo.LogBloat;
 - 10987C Lab03 — `Trainer_Docs/10987/Labfiles/Lab03/`
 - Microsoft Learn: [tempdb database](https://learn.microsoft.com/sql/relational-databases/databases/tempdb-database) · [sys.dm_db_log_info](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-db-log-info-transact-sql) · [ADR in tempdb (2025)](https://learn.microsoft.com/sql/relational-databases/accelerated-database-recovery-concepts)
 - Glenn Berry: [SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
-- ไฟล์ประกอบทั้งหมดอยู่ใน `Scripts/` ของโฟลเดอร์นี้ (`Scripts/01–05`) — โค้ดหลักของทุก Exercise ฝังอยู่ใน README ฉบับนี้แล้ว
+- สคริปต์ของแล็บนี้อยู่ใน `Sections/*/Scripts/` ของโมดูล จัดตามหัวข้อที่เกี่ยวข้อง (ลิงก์ในแต่ละ Exercise)

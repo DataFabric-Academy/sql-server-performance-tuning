@@ -219,4 +219,4 @@ GO
 - 10987C Lab10 — `Trainer_Docs/10987/Labfiles/Lab10/`
 - Microsoft Learn: [Performance monitoring tools](https://learn.microsoft.com/sql/relational-databases/performance/performance-monitoring-and-tuning-tools) · [Server roles (2022+)](https://learn.microsoft.com/sql/relational-databases/security/authentication-access/server-level-roles)
 - Glenn Berry: [SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
-- ไฟล์ประกอบทั้งหมดอยู่ใน `Scripts/` ของโฟลเดอร์นี้ (`Scripts/01–06`) — โค้ดหลักของทุก Exercise ฝังอยู่ใน README ฉบับนี้แล้ว
+- สคริปต์ของแล็บนี้อยู่ใน `Sections/*/Scripts/` ของโมดูล จัดตามหัวข้อที่เกี่ยวข้อง (ลิงก์ในแต่ละ Exercise)

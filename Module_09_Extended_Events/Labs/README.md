@@ -226,4 +226,4 @@ DROP EVENT SESSION [XE_TimedCapture] ON SERVER;
 
 - 10987C Lab09 — `Trainer_Docs/10987/Labfiles/Lab09/`
 - Microsoft Learn: [Extended Events](https://learn.microsoft.com/sql/relational-databases/extended-events/extended-events) · [Time-bound sessions (2025)](https://learn.microsoft.com/sql/relational-databases/extended-events/sql-server-extended-events-sessions) · [Use SSMS XEvent profiler](https://learn.microsoft.com/sql/relational-databases/extended-events/use-the-ssms-xe-profiler)
-- ไฟล์ประกอบทั้งหมดอยู่ใน `Scripts/` ของโฟลเดอร์นี้ (`Scripts/01–06`) — โค้ดหลักของทุก Exercise ฝังอยู่ใน README ฉบับนี้แล้ว
+- สคริปต์ของแล็บนี้อยู่ใน `Sections/*/Scripts/` ของโมดูล จัดตามหัวข้อที่เกี่ยวข้อง (ลิงก์ในแต่ละ Exercise)

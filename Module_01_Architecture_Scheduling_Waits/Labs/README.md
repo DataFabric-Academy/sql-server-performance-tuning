@@ -1,7 +1,7 @@
 # Lab 1: Wait Statistics & CPU Pressure Analysis (บทที่ 1)
 
 > **ที่มา**: ปรับปรุงจาก Microsoft 10987C **Lab01** (CPU and NUMA / Monitor Schedulers / Waits) + [Microsoft Learn — sys.dm_os_wait_stats](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql) + [Glenn Berry — SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
-> รูปแบบ: **Instruction + Code block** — ทุก Step รันได้ทันทีใน SSMS (สคริปต์เสริมอยู่ใน `Scripts/`)
+> รูปแบบ: **Instruction + Code block** — ทุก Step รันได้ทันทีใน SSMS (สคริปต์อยู่ใน `Sections/*/Scripts/` ตามหัวข้อ)
 
 ## Prerequisites
 
@@ -236,4 +236,4 @@ DBCC SQLPERF('sys.dm_os_wait_stats', CLEAR);
 - 10987C Lab01 (CPU and NUMA, Monitor Schedulers, Waits) — `Trainer_Docs/10987/Labfiles/Lab01/`
 - Microsoft Learn: [sys.dm_os_wait_stats](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql) · [sys.dm_os_schedulers](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-os-schedulers-transact-sql) · [Thread and Task Architecture Guide](https://learn.microsoft.com/sql/relational-databases/thread-and-task-architecture-guide)
 - Glenn Berry: [SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
-- ไฟล์ประกอบทั้งหมดอยู่ใน `Scripts/` ของโฟลเดอร์นี้ (`Scripts/01–08`) — โค้ดหลักของทุก Exercise ฝังอยู่ใน README ฉบับนี้แล้ว
+- สคริปต์ของแล็บนี้อยู่ใน `Sections/*/Scripts/` ของโมดูล จัดตามหัวข้อที่เกี่ยวข้อง (ลิงก์ในแต่ละ Exercise)
