@@ -174,4 +174,4 @@
 - **Microsoft Course 10987C** — Trainer Handbook, Slides, Demofiles และ Labfiles (อยู่ใน `Trainer_Docs/10987/`)
 - Waits & Queues methodology: SQLskills / Paul Randal & Glenn Berry wait type library
 
-> **รูปแบบ Lab ทุกบท:** เขียนเป็น *Instruction + Code block* — แต่ละ Step มีคำสั่งสั้น ๆ + โค้ด T-SQL ฉบับเต็มที่รันได้ทันทีใน SSMS โดยไม่ต้องเปิดไฟล์สคริปต์อื่น (สคริปต์ประกอบใน `Labs/Scripts/` ยังใช้ได้สำหรับผู้ที่ต้องการไฟล์แยก)
+> **รูปแบบ Lab ทุกบท:** เขียนเป็น *Instruction + Code block* — แต่ละ Step มีคำสั่งสั้น ๆ + โค้ด T-SQL ฉบับเต็มที่รันได้ทันทีใน SSMS โดยไม่ต้องเปิดไฟล์สคริปต์อื่น (สคริปต์ประกอบอยู่คู่หัวข้อใน `Sections/*/Scripts/`)

@@ -78,3 +78,6 @@ docs/_build/
 *.tar
 *.gz
 
+
+# ZCode plan files
+.zcode/
