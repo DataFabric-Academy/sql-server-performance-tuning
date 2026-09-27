@@ -122,10 +122,6 @@ WHERE wait_time_ms > 0;
 
 ## 6. หัวข้อขั้นสูงที่ควรรู้
 
----
-
-## 6. หัวข้อขั้นสูงที่ควรรู้
-
 - **Large Deficit First (LDF)** — อัลกอริทึมจัดคิว (2016+) ป้องกัน task ใหญ่ (เช่น read-ahead) แย่ง CPU จน task เล็กอดรัน
 - **Hidden Schedulers** — scheduler สำหรับงานระบบ: Ghost Cleanup, Query Store async, Checkpoint และ **DAC** (Dedicated Admin Connection ไว้กู้ชีพเมื่อ server ค้าง)
 - **PREEMPTIVE_\* waits** — เมื่อ SQL Server ต้องเรียก Windows API นอก SQLOS (เช่น `PREEMPTIVE_OS_FILEOPS`) สูงผิดปกติมักมาจาก Linked Server / xp_cmdshell / CLR
