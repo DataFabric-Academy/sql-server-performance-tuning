@@ -6,77 +6,111 @@
 
 ## ทำไม Section นี้จึงต้องมาก่อน
 
-เวลาผู้ใช้บอกว่า "ระบบช้า" สิ่งที่เกิดขึ้นจริงคือ Query หนึ่งตัวกำลังเดินทางผ่านชั้นต่าง ๆ ของ SQL Server — จาก network card, เข้าสู่ protocol layer, ผ่านการแปลงคำสั่ง, การตัดสินใจของ Optimizer, การเข้าถึงข้อมูลผ่าน Storage Engine และการจัดคิวบน CPU ผ่าน SQLOS คอขวดอาจเกิดที่ชั้นใดก็ได้ ถ้าไม่รู้แผนที่ เราจะเดาถูกได้อย่างไร?
+เวลาผู้ใช้บอกว่า "ระบบช้า" สิ่งที่เกิดขึ้นจริงคือ Query หนึ่งตัวกำลังเดินทางผ่านชั้นต่าง ๆ ของ SQL Server — จาก network card, เข้า Protocol layer, ผ่าน Query execution layer (พร้อมจุดตัดสินใจ Plan Cache), ลงสู่ Storage engine layer และถูก SQLOS จัดคิวบน CPU คอขวดอาจเกิดที่ชั้นใดก็ได้ ถ้าไม่รู้แผนที่ เราจะเดาถูกได้อย่างไร?
 
 Section นี้วางแผนที่นั้นให้ — เมื่อจบแล้วคุณจะตอบได้ว่า **"คำสั่งหนึ่งคำสั่ง เดินทางอย่างไร และแต่ละชั้นวัดอะไรได้บ้าง"**
 
 ---
 
-## 1. Connection Protocols — ประตูทางเข้าของทุกคำสั่ง
+## แผนภาพการทำงานของ SQL Server Database Engine
 
-Client เชื่อมต่อเข้าสู่ Database Engine ผ่าน Endpoints ที่รองรับ 3 โปรโตคอล:
+![SQL Server Database Engine Architecture](images/engine-architecture.png)
 
-| Protocol | ใช้เมื่อไร | ข้อสังเกตด้าน Performance |
-|:---------|:----------|:--------------------------|
+แผนภาพนี้คือ **แผนที่หลักของทั้งหลักสูตร** — ทุก Module จะซูมเข้าไปดูทีละส่วน:
+
+| ส่วนในแผนภาพ | สาระสำคัญ | Module ที่เจาะลึก |
+|:-------------|:----------|:------------------|
+| Protocol layer (TDS/SNI) | ประตูทางเข้าของคำสั่ง | Section นี้ |
+| Query execution layer (Parser → Optimizer → Executor + Plan Cache) | จุดเกิด Execution Plan | Module 7 |
+| Buffer Pool (Plan Cache + Data Cache) | ที่พักของ Plan และ Data Pages | Module 4, 8 |
+| Storage engine layer (Access Methods + 4 Managers) | การเข้าถึง Data Files / Transaction Log | Module 2, 3 |
+| SQLOS layer (Thread Scheduling + Memory Management) | ผู้จัดคิว CPU และ Memory | Module 1 (Sections ถัดไป), Module 4 |
+
+---
+
+## 1. Protocol Layer — ประตูทางเข้าของทุกคำสั่ง
+
+Client เชื่อมต่อผ่าน **TDS (Tabular Data Stream Protocol)** ซึ่งเดินทางบน **SNI (SQL Server Network Interface)** ที่รองรับ 3 ช่องทาง:
+
+| ช่องทาง | ใช้เมื่อไร | ข้อสังเกตด้าน Performance |
+|:--------|:----------|:--------------------------|
 | **Shared Memory** | เชื่อมต่อภายในเครื่องเดียวกัน (เช่น SSMS บน server) | เร็วที่สุด — ไม่มี network stack |
-| **Named Pipes** | ระบบ LAN แบบดั้งเดิม | ปัจจุบันพบน้อยลง |
+| **Named Pipes** | ระบบ LAN แบบดั้งเดิม | พบน้อยลงในระบบใหม่ |
 | **TCP/IP** | มาตรฐานหลักของทุก application | ตัวแปรสำคัญคือ network latency |
 
-**ยุคใหม่ (SQL Server 2022+):** TDS 8.0 บังคับให้การเข้ารหัส TLS 1.3 เกิดขึ้น **ก่อน** ที่ TDS session จะเริ่ม (strict encryption) — ปลอดภัยขึ้น และ handshake ชัดเจนขึ้น ซึ่งสำคัญเวลาวิเคราะห์ network trace
+**ยุคใหม่ (SQL Server 2022+):** TDS 8.0 บังคับให้ TLS 1.3 เริ่มก่อน TDS session — ปลอดภัยขึ้นและ handshake ชัดเจนขึ้น
 
-> **จุดเชื่อมโยง:** เวลาเจอ wait type `ASYNC_NETWORK_IO` ปัญหามักไม่ใช่โปรโตคอล แต่เป็นฝั่ง client ที่ "รับข้อมูลไม่ทัน" — เราจะกลับมาที่ตัวนี้ในหัวข้อ Wait Statistics
+> **จุดเชื่อมโยง:** wait `ASYNC_NETWORK_IO` ที่เจอบ่อย ปัญหามักไม่ใช่ชั้นนี้ แต่เป็น client ที่ "รับข้อมูลไม่ทัน" — จะกลับมาที่ตัวนี้ในหัวข้อ Wait Statistics
 
 ---
 
-## 2. Database Engine Layers — ชั้นการทำงานสามชั้น
+## 2. Query Execution Layer — Command Parser → Optimizer → Executor
 
-```mermaid
-flowchart TD
-    A[Client App] -->|TDS| B[Protocol Layer - SNI]
-    B --> C[Query Execution Layer<br/>Relational Engine]
-    C -->|Parser| C1[Command Parser]
-    C1 -->|Query Tree| C2[Algebrizer - Binding]
-    C2 -->|Tree| C3[Query Optimizer]
-    C3 -->|Execution Plan| C4[Query Executor]
-    C4 --> D[Storage Engine]
-    D --> D1[Access Methods]
-    D --> D2[Buffer Manager]
-    D --> D3[Transaction Manager]
-    D --> E[(Data Files)]
+### 2.1 Command Parser
+ตรวจ syntax ของ T-SQL แปลงเป็น internal format ก่อนส่งต่อ
+
+### 2.2 Query Optimizer + จุดตัดสินใจสำคัญที่สุดของ diagram นี้
+
+```
+Query เข้ามา → มี Plan อยู่ใน Plan Cache หรือไม่?
+├── ใช่  → หา Plan จาก Plan Cache มาใช้เลย (ข้ามการ compile — เร็ว)
+└── ไม่ใช่ → วิเคราะห์ (ดู Statistics) สร้าง Plan ใหม่ → เก็บลง Plan Cache
 ```
 
-### 2.1 Query Execution Layer (Relational Engine)
+- **Optimizer** ใช้กลไก **Cost-based**: ดู Statistics ประเมินจำนวนแถว เลือก plan ที่ต้นทุนต่ำสุดในเวลาอันสมควร
+- Plan ที่ถูก cache จะถูกใช้ซ้ำ — นี่คือเหตุผลที่ Parameter สำคัญ (ดู Module 8: Parameter Sniffing, Plan Cache Pollution)
 
-| องค์ประกอบ | หน้าที่ | อาการเมื่อมีปัญหา |
-|:-----------|:--------|:-----------------|
-| **Command Parser** | ตรวจ syntax แปลงเป็น internal format | — |
-| **Algebrizer** | Binding: resolve object names, ตรวจ data types สร้าง Query Tree | ความผิดพลาดชื่อ object/type mismatch |
-| **Query Optimizer** | เลือก Execution Plan ที่ต้นทุนต่ำสุด (Cost-based) | Plan แย่ = query ช้าแม้ hardware ดี |
-| **Query Executor** | รัน plan ผ่าน Storage Engine | รอ resource ระหว่างรัน |
-
-### 2.2 Storage Engine
-
-| องค์ประกอบ | หน้าที่ |
-|:-----------|:--------|
-| **Access Methods** | ตัดสินใจ Table Scan vs Index Seek, จัดการ pages และ extents |
-| **Buffer Manager** | จัดการ Buffer Pool — cache data pages ใน memory |
-| **Transaction Manager** | ควบคุม Atomicity, Write-Ahead Logging และ Locking |
-
-### 2.3 SQLOS — "OS จิ๋ว" ใน SQL Server
-
-**SQLOS (SQL Server Operating System)** คือชั้น user-mode ที่ SQL Server สร้างขึ้นเพื่อจัดการทรัพยากรเอง แทนการพึ่ง Windows ทั้งหมด:
-
-- จัดการ **Schedulers / Workers / Tasks** (การแบ่ง CPU)
-- จัดการ **Memory** ของ engine ทั้งหมด
-- จัดการ **Exception handling, CLR hosting, deadlock detection**
-
-> **หัวใจของ Section นี้:** เพราะ SQL Server จัดการ CPU และ Memory เอง ตัวชี้วัดของ Windows (Task Manager) จึง **ไม่เพียงพอ** — เราต้องอ่านข้อมูลจาก SQLOS ผ่าน DMVs เช่น `sys.dm_os_schedulers`, `sys.dm_os_memory_clerks` ซึ่งเป็นเครื่องมือหลักของหลักสูตรทั้งเล่ม
+### 2.3 Query Executor
+รับ Execution Plan มารัน — สั่งงาน Storage Engine ทีละ operator (Scan, Seek, Join, Sort...)
 
 ---
 
-## 3. ตัวอย่าง: เดินทางของ Query หนึ่งตัว
+## 3. Buffer Pool — Plan Cache + Data Cache
 
-ลองตาม query นี้ทีละขั้น:
+กล่องขวามือของ diagram คือ **Buffer Pool** — memory ก้อนใหญ่ที่สุดของ SQL Server ซึ่งมี "ที่พัก" สองชนิด:
+
+| ส่วน | เก็บอะไร | ใครใช้ |
+|:-----|:---------|:-------|
+| **Plan Cache** (ส่วนเหลือง) | Compiled execution plans | Query execution layer — จุดตัดสินใจ "มี Plan อยู่หรือไม่?" |
+| **Data Cache** (ส่วนน้ำเงิน) | Data pages ที่ถูกอ่านจาก disk | Buffer Manager — ถ้า page อยู่ในนี้ = Logical Read (ไม่ต้องแตะ disk) |
+
+> **จุดเชื่อมโยง:** Page ที่ถูกอ่านมาแล้วจะพำนักใน Data Cache — อายุเฉลี่ยของมันคือ PLE (Module 4) และ Plan Cache ที่บวมผิดปกติคือปัญหายอดฮิตของ ad-hoc workload (Module 8)
+
+---
+
+## 4. Storage Engine Layer — Access Methods และ 4 Managers
+
+เมื่อ Executor ต้องการข้อมูล งานจะไหลผ่าน **Access Methods** ซึ่งเป็นด่างหน้าที่คุยกับผู้จัดการ 4 คน:
+
+| Manager | หน้าที่ | จัดการกับ |
+|:--------|:--------|:----------|
+| **Buffer Manager** | ตัดสินใจว่า page อยู่ใน Buffer Pool หรือต้องอ่านจาก disk | Data Cache |
+| **Page Manager** | อ่าน/เขียน page (8 KB) จริง ๆ กับ Data Files | Data Files |
+| **Transaction Manager** | ควบคุม Atomicity + เขียน Log ตามหลัก Write-Ahead Logging | Transaction Log File |
+| **Lock Manager** | บริหาร Locks ให้ transaction ไม่เหยียบกัน | Lock structures |
+
+- **Logical Read** = อ่านจาก Data Cache | **Physical Read** = ต้องอ่านจาก Data Files จริง
+- ทุกการแก้ไขข้อมูล **ต้องเขียน Transaction Log ก่อนเสมอ** (WAL) — ต้นตอของ wait `WRITELOG`
+- **Access Methods** ยังตัดสินใจ Scan vs Seek — ตัวชี้วัดสำคัญของ Module 6, 7
+
+---
+
+## 5. SQLOS Layer — ฐานที่รองรับทุกอย่างไว้
+
+ชั้นล่างสุดของ diagram คือ **SQLOS** ที่มีสองหน้าที่หลัก:
+
+| หน้าที่ | ทำอะไร | อาการเมื่อมีปัญหา |
+|:--------|:-------|:-----------------|
+| **Thread Scheduling** | จัดคิว CPU ให้ทุก task (cooperative scheduling, quantum ~4 ms) | `SOS_SCHEDULER_YIELD`, runnable queue ยาว |
+| **Memory Management** | แบ่ง memory ให้ทุก component ผ่าน Memory Clerks | Memory pressure, `RESOURCE_SEMAPHORE` |
+
+> **หัวใจของ Section นี้:** เพราะ SQL Server จัดการ CPU และ Memory เอง ตัวชี้วัดของ Windows (Task Manager) จึง **ไม่เพียงพอ** — เราต้องอ่านข้อมูลจาก SQLOS ผ่าน DMVs (`sys.dm_os_schedulers`, `sys.dm_os_memory_clerks`) ซึ่งเป็นเครื่องมือหลักของหลักสูตรทั้งเล่ม
+
+---
+
+## 6. ตัวอย่าง: เดินตาม diagram ทีละลูกศร
+
+ลองตาม query นี้ โดยมีเลขกำกับตรงกับจุดในแผนภาพ:
 
 ```sql
 SELECT TOP (10) CustomerID, SUM(TotalDue) AS Total
@@ -85,35 +119,32 @@ GROUP BY CustomerID
 ORDER BY Total DESC;
 ```
 
-1. **Protocol Layer** — SSMS ส่ง TDS packet ผ่าน TCP/IP → SNI รับและตรวจ session
-2. **Parser/Algebrizer** — ตรวจ syntax, resolve ว่า `Sales.SalesOrderHeader` คือตารางอะไร, ตรวจว่าคอลัมน์มีจริง
-3. **Optimizer** — ดู Statistics ของตาราง ประเมินจำนวนแถว เลือกว่าจะ Scan หรือ Seek, Hash หรือ Stream Aggregate → ได้ Execution Plan
-4. **Plan Cache** — plan ถูกเก็บไว้ใช้ซ้ำ (ดูต่อ Module 8)
-5. **Query Executor** — ขอ pages จาก Access Methods → Buffer Manager
-   - ถ้า page อยู่ใน Buffer Pool → **Logical Read** (เร็ว)
-   - ถ้าไม่มี → **Physical Read** จาก disk → เกิด wait `PAGEIOLATCH_SH`
-6. **SQLOS** — task ของ query รอ scheduler ให้เวลา CPU → ถ้า CPU แน่น เกิด `SOS_SCHEDULER_YIELD`
-7. **Results** — ส่งกลับ client; ถ้า client รับช้า → `ASYNC_NETWORK_IO`
+1. **Protocol layer** — SSMS ส่ง TDS packet ผ่าน SNI (TCP/IP) เข้ามา
+2. **Command Parser** — ตรวจ syntax แล้วส่งต่อ
+3. **Query Optimizer** — ตั้งคำถามตาม diagram: **"มี Plan อยู่หรือไม่?"**
+   - ครั้งแรก → ไม่มี → ดู Statistics → สร้าง Plan → **เก็บลง Plan Cache**
+   - ครั้งถัดไป → ใช่ → **หา Plan จาก Plan Cache** มาใช้เลย
+4. **Query Executor** — รับ plan สั่งงาน **Access Methods**
+5. **Buffer Manager / Page Manager** — ขอ data pages: ถ้าอยู่ใน **Data Cache** → Logical Read; ไม่มี → อ่านจาก **Data Files**
+6. **Transaction Manager / Lock Manager** — คุมความถูกต้องและกันเหยียบกันระหว่างรัน
+7. **SQLOS layer** — ตลอดเวลาที่ทำงาน Thread Scheduling แบ่ง CPU, Memory Management ดูแล memory ให้
+8. **Results** — ส่งกลับ client; ถ้า client รับช้า → `ASYNC_NETWORK_IO`
 
-> **แบบฝึกหัดคิด:** query เดียวกันนี้ "ช้า" ได้จากกี่จุด? — plan แย่ (ชั้น 3), disk ช้า (ชั้น 5), CPU แน่น (ชั้น 6), client ช้า (ชั้น 7) นี่คือเหตุผลที่เราต้องมีระบบวินิจฉัย ไม่เดา
-
----
-
-## 4. เชื่อมโยงกับเวอร์ชันใหม่ (ถึง SQL Server 2025)
-
-- **TDS 8.0 + TLS 1.3** — การเชื่อมต่อเข้มงวดขึ้น วัดผล network ได้ตรงขึ้น
-- **`sys.dm_exec_query_plan_stats`** (2019+) — ดึง Last Actual Plan ได้จาก cache โดยไม่ต้องพึ่ง Query Store
-- **SQL Server 2025 บน Linux** — สถาปัตยกรรมชั้นในเหมือนกันทุกประการ แนวคิดทั้งหมดในหลักสูตรนี้ใช้ข้าม platform ได้
+> **แบบฝึกหัดคิด:** query เดียวกันนี้ "ช้า" ได้จากกี่จุดในแผนภาพ? — plan แย่ (Optimizer), plan cache พัง (Plan Cache), disk ช้า (Page Manager → Data Files), memory ไม่พอ (Buffer Manager), CPU แน่น (SQLOS), client รับไม่ทัน (Protocol layer) — นี่คือเหตุผลที่เราต้องมีระบบวินิจฉัย ไม่เดา
 
 ---
 
 ## สรุป Section 1
 
-- SQL Server แบ่งเป็น 3 ชั้นหลัก: **Protocol → Relational Engine → Storage Engine** และมี **SQLOS** เป็น OS ภายในจัดการ CPU/Memory
-- คอขวดเกิดได้ทุกชั้น — การรู้แผนที่คือรากฐานของการวินิจฉัยแบบมืออาชีพ
-- เครื่องมือวัดของเราคือ DMVs ที่ SQLOS เปิดเผย (`sys.dm_os_*`, `sys.dm_exec_*`)
+1. SQL Server = **Protocol layer → Query execution layer → Storage engine layer** โดยมี **SQLOS** รองรับอยู่ล่างสุด
+2. **Buffer Pool** มีทั้ง **Plan Cache** (พัก execution plans) และ **Data Cache** (พัก data pages)
+3. จุดตัดสินใจ "มี Plan อยู่หรือไม่?" คือหัวใจของ performance — hit = เร็ว, miss = เสียค่า compile
+4. เครื่องมือวัดของเราคือ DMVs ที่ SQLOS เปิดเผย (`sys.dm_os_*`, `sys.dm_exec_*`)
 
-**ตรวจความเข้าใจ:** Algebrizer ทำอะไรก่อนส่งงานให้ Optimizer? และเพราะอะไร Task Manager จึงไม่ใช่เครื่องมือหลักในการวิเคราะห์ memory ของ SQL Server?
+**ตรวจความเข้าใจ:**
+1. Algebrizer/Command Parser ทำอะไรก่อนส่งงานให้ Optimizer?
+2. "มี Plan อยู่หรือไม่?" ตั้งคำถามกับใคร และตอบจากอะไร?
+3. เพราะอะไร Transaction Manager ถึงต้องเขียน Transaction Log ก่อนแก้ Data Files?
 
 **➡ ถัดไป:** [Section 1.2 — Scheduling: Windows vs SQL Server](../02_Scheduling_Windows_vs_SQL/README.md)
 
