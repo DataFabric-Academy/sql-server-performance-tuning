@@ -10,6 +10,23 @@
 
 ---
 
+## แผนภาพหลักของ Section นี้ — จำรูปนี้ไว้ แล้วอ่านต่อได้ทั้งหมด
+
+![Thread Life Cycle (State Machine) — worker state transitions และ scheduler-managed lists](images/thread-life-cycle.png)
+
+> ✦ **State** (สถานะในกล่องซ้าย) บอกว่า *"worker กำลังทำอะไร"* — ✦ **List** (ตารางขวา) บอกว่า *"worker กำลังรออะไร"*
+
+**แผนที่การอ่าน Section นี้:**
+
+| ของแผนภาพ | จะเล่าละเอียดใน |
+|:----------|:----------------|
+| ตารางขวา — Scheduler-managed Lists ทั้ง 5 | **หัวข้อ 2** |
+| ซ้าย — RUNNABLE → RUNNING → COMPLETED | **หัวข้อ 3** |
+| ลูกศรแดง "Quantum หมด กลับเข้า Runnable" + ลูกศรเขียว "resource พร้อม" | **หัวข้อ 4** |
+| เส้นทาง request ตั้งแต่ Client เข้ามา | **หัวข้อ 5** |
+
+---
+
 ## 1. Preemptive vs Non-Preemptive (Cooperative) Scheduling
 
 | Aspect | Windows (Preemptive) | SQL Server (Non-Preemptive / Cooperative) |
@@ -44,11 +61,9 @@ sequenceDiagram
 
 ---
 
-## 2. SOS Scheduler — Scheduler-managed Lists (ห้าคิวในหนึ่ง scheduler)
+## 2. SOS Scheduler — Scheduler-managed Lists (ฝั่งขวาของแผนภาพ)
 
-แผนภาพใน Section 1.2 (ด้านขวา) คือหัวใจของ scheduler: task เปลี่ยน "State" ไปเรื่อย ๆ และ SQLOS จัดเก็บ worker ตามสถานะนั้นไว้ใน "List" ของ scheduler
-
-> ✦ **State** บอกว่า *"worker กำลังทำอะไร"* — ✦ **List** บอกว่า *"worker กำลังรออะไร"*
+task เปลี่ยน "State" ไปเรื่อย ๆ และ SQLOS จัดเก็บ worker ตามสถานะนั้นไว้ใน "List" ของ scheduler — ตรงกับตาราง **SCHEDULER-MANAGED LISTS** ด้านขวาของแผนภาพ:
 
 | List | หน้าที่ |
 |:-----|:--------|
@@ -64,9 +79,26 @@ sequenceDiagram
 
 ---
 
-## 3. Quantum หมด → กลับเข้า Runnable (เส้นทางสีแดงใน diagram)
+## 3. Thread Life Cycle — เล่า State Machine เป็นเรื่อง (ฝั่งซ้ายของแผนภาพ)
 
-worker ที่ได้ CPU จะครองมันได้ไม่เกิน **quantum ~4 ms** ถ้างานยังไม่จบต้องยอม (yield) แล้วกลับเข้า Runnable list ต่อท้ายคิว:
+ยกกล่อง **WORKER STATE TRANSITIONS** ด้านซ้ายมาเล่าเป็นเรื่องราวตามลูกศร:
+
+1. task เข้ามาใหม่ → ต่อคิวที่ **RUNNABLE QUEUE** (state: runnable)
+2. เมื่อถึงคิว scheduler **มอบ CPU** → **RUNNING ON CPU** (state: running)
+3. ทำงานสำเร็จ → **COMPLETED** — จบการทำงาน
+4. ถ้าระหว่างทางต้องรอ I/O หรือ resource (ไม่ใช่ CPU) → ถูก block เข้าสู่ **SUSPENDED / WAITER** (state: suspended)
+5. เมื่อ **resource พร้อม** → กลับเข้า **RUNNABLE** ต่อคิวใหม่
+6. ถ้าใช้ CPU ครบ **Quantum** แต่งานยังไม่จบ → กลับเข้า **RUNNABLE** เช่นกัน
+
+**อ่านสถานะให้เป็นเรื่อง:**
+- Response Time = **Service Time** (RUNNING) + **Resource Wait** (SUSPENDED) + **Signal Wait** (RUNNABLE)
+- แก้ผิดจุด = เสียเวลาเปล่า: งานรอ disk ไปเพิ่ม CPU ก็ไม่ช่วย
+
+---
+
+## 4. Quantum หมด → กลับเข้า Runnable (เส้นทางย้อนกลับ) + Signal Wait
+
+worker ที่ได้ CPU จะครองมันได้ไม่เกิน **quantum ~4 ms** ถ้างานยังไม่จบต้องยอม (yield) แล้วกลับเข้า Runnable list ต่อท้ายคิว — ตรงลูกศรแดง "Quantum หมด กลับเข้า Runnable" ในแผนภาพ:
 
 - กลับเข้า Runnable รอบละครั้งเป็นเรื่องปกติของระบบ — แต่ถ้า **ย้อนกลับถี่มากและ Runnable list ยาวต่อเนื่อง** = งานล้น CPU
 - เวลาที่เสียไปกับการต่อคิวนี้คือ **Signal Wait** — วัดได้จาก:
@@ -82,7 +114,7 @@ WHERE wait_time_ms > 0;
 
 ---
 
-## 4. User Request Life Cycle — แต่ละขั้นดู DMV ไหน
+## 5. User Request Life Cycle — แต่ละขั้นดู DMV ไหน
 
 การเดินทางของ request สอดคล้องกับ state ของ worker ทุกขั้น:
 
@@ -101,25 +133,6 @@ WHERE wait_time_ms > 0;
 
 ---
 
-## 5. Thread Life Cycle (State Machine)
-
-![Thread Life Cycle (State Machine) — worker state transitions และ scheduler-managed lists](images/thread-life-cycle.png)
-
-**อ่านด้านซ้าย (Worker State Transitions) เป็นเรื่องราว:**
-
-1. task เข้ามาใหม่ → ต่อคิวที่ **RUNNABLE QUEUE** (state: runnable)
-2. เมื่อถึงคิว scheduler **มอบ CPU** → **RUNNING ON CPU** (state: running)
-3. ทำงานสำเร็จ → **COMPLETED** — จบการทำงาน
-4. ถ้าระหว่างทางต้องรอ I/O หรือ resource (ไม่ใช่ CPU) → ถูก block เข้าสู่ **SUSPENDED / WAITER** (state: suspended)
-5. เมื่อ **resource พร้อม** → กลับเข้า **RUNNABLE** ต่อคิวใหม่
-6. ถ้าใช้ CPU ครบ **Quantum** แต่งานยังไม่จบ → กลับเข้า **RUNNABLE** เช่นกัน
-
-**อ่านสถานะให้เป็นเรื่อง:**
-- Response Time = **Service Time** (RUNNING) + **Resource Wait** (SUSPENDED) + **Signal Wait** (RUNNABLE)
-- แก้ผิดจุด = เสียเวลาเปล่า: งานรอ disk ไปเพิ่ม CPU ก็ไม่ช่วย
-
----
-
 ## 6. หัวข้อขั้นสูงที่ควรรู้
 
 - **Large Deficit First (LDF)** — อัลกอริทึมจัดคิว (2016+) ป้องกัน task ใหญ่ (เช่น read-ahead) แย่ง CPU จน task เล็กอดรัน
@@ -132,8 +145,9 @@ WHERE wait_time_ms > 0;
 ## สรุป Section 2
 
 1. SQL Server จัดคิว CPU เองแบบ **Cooperative** (quantum ~4 ms, thread yield เอง)
-2. อาการ CPU pressure อ่านได้จาก **runnable queue** และ **Signal Wait Ratio** ไม่ใช่แค่ % CPU
-3. Life cycle 3 สถานะ **RUNNABLE → RUNNING → SUSPENDED** คือภาษากลางของการวินิจฉัย
+2. **State** บอก worker กำลังทำอะไร / **List** บอก worker กำลังรออะไร — อ่านคู่กันตามแผนภาพ
+3. อาการ CPU pressure อ่านได้จาก **runnable queue** และ **Signal Wait Ratio** ไม่ใช่แค่ % CPU
+4. Life cycle 3 สถานะ **RUNNABLE → RUNNING → SUSPENDED** คือภาษากลางของการวินิจฉัย
 
 **ตรวจความเข้าใจ:**
 1. task อยู่ใน Runnable List แปลว่ากำลังรออะไร? ต่างจาก Waiter List อย่างไร?
