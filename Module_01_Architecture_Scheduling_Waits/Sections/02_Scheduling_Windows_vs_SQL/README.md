@@ -20,10 +20,11 @@
 
 | ของแผนภาพ | จะเล่าละเอียดใน |
 |:----------|:----------------|
-| ตารางขวา — Scheduler-managed Lists ทั้ง 5 | **หัวข้อ 2** |
-| ซ้าย — RUNNABLE → RUNNING → COMPLETED | **หัวข้อ 3** |
-| ลูกศรแดง "Quantum หมด กลับเข้า Runnable" + ลูกศรเขียว "resource พร้อม" | **หัวข้อ 4** |
-| เส้นทาง request ตั้งแต่ Client เข้ามา | **หัวข้อ 5** |
+| เส้นทางหลัก เริ่ม → RUNNABLE → RUNNING → COMPLETED | **หัวข้อ 3** |
+| ลูกศรส้ม รอ I/O / resource → SUSPENDED / WAITER | **หัวข้อ 3** |
+| ลูกศรแดง "Quantum หมด กลับเข้า Runnable" | **หัวข้อ 4** |
+| ลูกศรเขียว "resource พร้อม กลับเข้า Runnable" | **หัวข้อ 4** |
+| สองกติกาท้ายภาพ (ให้ CPU ครั้งละหนึ่งตัว / รอ resource ออกจาก CPU) | **หัวข้อ 2** |
 
 ---
 
@@ -61,9 +62,9 @@ sequenceDiagram
 
 ---
 
-## 2. SOS Scheduler — Scheduler-managed Lists (ฝั่งขวาของแผนภาพ)
+## 2. SOS Scheduler — Scheduler-managed Lists (สองกติกาท้ายภาพ)
 
-task เปลี่ยน "State" ไปเรื่อย ๆ และ SQLOS จัดเก็บ worker ตามสถานะนั้นไว้ใน "List" ของ scheduler — ตรงกับตาราง **SCHEDULER-MANAGED LISTS** ด้านขวาของแผนภาพ:
+worker เปลี่ยน "State" ไปเรื่อย ๆ และ SQLOS จัดเก็บ worker ตามสถานะนั้นไว้ใน "List" ของ scheduler — สองกติกาท้ายแผนภาพคือกติกาข้อ 1 และ 2 ของ section นี้:
 
 | List | หน้าที่ |
 |:-----|:--------|
@@ -79,7 +80,7 @@ task เปลี่ยน "State" ไปเรื่อย ๆ และ SQLOS 
 
 ---
 
-## 3. Thread Life Cycle — เล่า State Machine เป็นเรื่อง (ฝั่งซ้ายของแผนภาพ)
+## 3. Thread Life Cycle — เล่า State Machine เป็นเรื่อง
 
 ยกกล่อง **WORKER STATE TRANSITIONS** ด้านซ้ายมาเล่าเป็นเรื่องราวตามลูกศร:
 
