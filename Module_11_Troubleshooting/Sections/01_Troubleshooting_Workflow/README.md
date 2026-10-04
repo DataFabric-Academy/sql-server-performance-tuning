@@ -397,6 +397,18 @@ SELECT (SELECT COUNT(*) FROM sys.dm_exec_requests
 
 ปัญหาส่งต่อกันเป็นลูกโซ่: **Storage ช้า → page เข้า buffer ช้า → thread ถือ LATCH นาน → thread อื่นรอ PAGELATCH → ดูเหมือน blocking → ผู้ใช้เรียกว่า "ระบบ hang"** เจอ blocking อย่าเพิ่งโทษ Lock Manager — ไล่กลับไปดู I/O latency ก่อนเสมอ (Don't shoot the messenger)
 
+```mermaid
+graph LR
+    A["Slow Disk I/O<br/>PAGEIOLATCH_SH/EX"] --> B["Slow Log Writes<br/>WRITELOG"]
+    B --> C["LATCH ถือนานขึ้น<br/>PAGELATCH_*"]
+    C --> D["Blocking โตขึ้น<br/>LCK_M_* (ดูเหมือน lock เป็นตัวร้าย)"]
+    D --> E["System-wide Latency<br/>ผู้ใช้เรียกว่า hang"]
+    style A fill:#fdeee3,stroke:#E8590C
+    style E fill:#fdeee3,stroke:#E8590C
+```
+
+> **ROOT CUT** = แก้ที่ต้นทาง (I/O latency) ลูกโซ่หยุดทั้งสาย · **SYMPTOM CUT** = แก้ที่ปลาย (เพิ่ม lock timeout, ฆ่า session) อาการกลับมาเสมอ — Don't shoot the messenger
+
 ---
 
 ## สรุป Section 11.1

@@ -65,6 +65,17 @@ ROLLBACK TRANSACTION;
 
 **ผลที่ได้ (รันจริง):** สี่แถว — `DATABASE (S)`, `OBJECT (IX)`, `PAGE 1:17579 (IX)`, `KEY (a83f3276fc11) (X)` นี่คือ **ทั้ง hierarchy อยู่ในผลเดียว**: เอนจินล็อกแถวตรง ๆ (KEY X) แล้ว "ประกาศเจตนา" บนระดับแม่ทั้งหมด (PAGE IX, OBJECT IX) — อธิบายต่อในหัวข้อถัดไป
 
+```mermaid
+graph TD
+    DB["DATABASE — S"] --> OBJ["OBJECT / Table — IX"]
+    OBJ --> PG["PAGE 8 KB — IX"]
+    PG --> KEY["KEY (แถว) — X"]
+    KEY -. "escalation: ~5,000 locks หรือ lock memory เกิน 24%<br/>» แทนทั้งหมดด้วย OBJECT X เพียงตัวเดียว" .-> ESC["Escalated: OBJECT — X"]
+    style ESC fill:#fdeee3,stroke:#E8590C
+```
+
+> อ่านจากบนลงล่าง = ล็อกละเอียดขึ้น (concurrency ดี, memory แพง) — เส้นประสีส้มคือ **Lock Escalation** ที่ยกไปรวมเป็นล็อกหยาบเมื่อต้นทุนเกินเกณฑ์ (ลงลึกในหัวข้อ 4)
+
 ---
 
 ## 2. Lock Granularity — เลือกล็อกหยาบหรือละเอียด
