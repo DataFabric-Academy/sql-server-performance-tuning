@@ -1,3 +1,6 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+-- หมายเหตุ: บน SQL Server 2019/2022 ให้แก้ USE เป็น AdventureWorks2022 ก่อนรัน
+
 -- 01_Workload_IO_Activity.sql
 -- Generate I/O-intensive workload for Demo Script 04_Virtual_File_Stats.sql
 -- Run this in a separate session, then run 04_Virtual_File_Stats.sql in another window

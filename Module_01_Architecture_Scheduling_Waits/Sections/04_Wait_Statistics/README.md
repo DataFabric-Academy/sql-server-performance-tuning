@@ -4,6 +4,9 @@
 
 > *"SQL Server ไม่เคยเงียบ — มันบันทึกทุกวินาทีที่ต้องรอ ไว้ให้เราอ่าน"*
 
+> **ต้องรู้มาก่อน**: [Section 1.2 — Scheduling](../02_Scheduling_Windows_vs_SQL/README.md) (สถานะ RUNNABLE / RUNNING / SUSPENDED และ Signal Wait) พร้อมสิทธิ์ `VIEW SERVER STATE` สำหรับอ่าน `sys.dm_os_wait_stats`
+> ศัพท์ใหม่ดู [Glossary](../../../Glossary.md)
+
 ## เปิดเรื่อง: Waits & Queues Methodology
 
 ทุกครั้งที่ task ต้องหยุดรอ (SUSPENDED) SQL Server บันทึกว่า "รออะไร นานแค่ไหน กี่ครั้ง" ไว้ใน `sys.dm_os_wait_stats` ปรัชญา **Waits & Queues** คือ: แทนที่จะเดาว่าระบบช้าเพราะอะไร ให้อ่านบัญชีการรอที่ engine จดไว้ให้เอง — คอขวดจริงจะจัดอันดับให้อยู่แล้ว

@@ -58,7 +58,7 @@
 ---
 
 
-## ### 7.1 ตัวเลข Memory ปัจจุบัน
+### 7.1 ตัวเลข Memory ปัจจุบัน
 - **SQL Server 2025 Standard edition: buffer pool สูงสุด 256 GB** ต่อ instance (เพิ่มจาก 128 GB ใน 2022) — วางแผน edition ตามขนาด working set ได้ง่ายขึ้น
 - Standard Developer / Enterprise Developer editions (ฟรี ใช้พัฒนา) ให้ความจุเท่ารุ่นจ่ายเงิน — เหมาะกับการจำลอง Lab
 

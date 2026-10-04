@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- 04_Database_File_Sizes.sql
 -- File sizes, growth settings and locations for all databases
 -- Inspired by: SQL Server 2025 Diagnostic Information Queries (Glenn Berry)

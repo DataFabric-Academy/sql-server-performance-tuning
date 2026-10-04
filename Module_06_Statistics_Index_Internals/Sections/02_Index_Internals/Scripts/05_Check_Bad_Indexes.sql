@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- 05_Check_Bad_Indexes.sql
 -- Possible bad nonclustered indexes (writes > reads) – based on Glenn Berry 2025, Query 71
 --   https://glennsqlperformance.com/resources/

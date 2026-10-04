@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- 04_Yield_Mechanism.sql
 -- Source: Adpated from phakkhaphong/SQL-Server-Performance
 -- Purpose: Analyze SOS_SCHEDULER_YIELD mechanism (Runnable -> Running cycle).

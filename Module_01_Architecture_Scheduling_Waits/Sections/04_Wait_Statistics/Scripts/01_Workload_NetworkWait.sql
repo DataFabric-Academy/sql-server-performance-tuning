@@ -1,3 +1,6 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+-- หมายเหตุ: บน SQL Server 2019/2022 ให้แก้ USE เป็น AdventureWorks2022 ก่อนรัน
+
 -- Workload: Simulate ASYNC_NETWORK_IO
 -- Instructions: Run this in SSMS. Ensure "Results to Grid" is selected.
 -- Analysis: Check sys.dm_os_wait_stats for ASYNC_NETWORK_IO

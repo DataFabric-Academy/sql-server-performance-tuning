@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- 02_XE_Blocking_Deadlock.sql
 -- Source: Adapted from phakkhaphong/SQL-Server-Performance/XE
 -- Purpose: Capture Blocking (>5 sec) and Deadlocks using Extended Events.

@@ -1,3 +1,6 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+-- หมายเหตุ: บน SQL Server 2019/2022 ให้แก้ USE เป็น AdventureWorks2022 ก่อนรัน
+
 -- Workload: Chaos Generator (Blocking + CPU + IO)
  USE AdventureWorks2025;
  GO

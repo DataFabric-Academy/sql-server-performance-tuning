@@ -1,3 +1,6 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+-- หมายเหตุ: บน SQL Server 2019/2022 ให้แก้ USE เป็น AdventureWorks2022 ก่อนรัน
+
 -- 03_Workload_CPU_Queries.sql
 -- Generate CPU-intensive queries for Demo Script 06_Top_CPU_Queries.sql
 -- Run this first, then run 06_Top_CPU_Queries.sql to see CPU usage

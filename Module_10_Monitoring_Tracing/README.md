@@ -52,7 +52,7 @@ sys.dm_exec_requests ใช้ตรวจสอบคำสั่งที่�
 ---
 
 
-## ### 7.1 ชุดเครื่องมือปัจจุบัน
+### 7.1 ชุดเครื่องมือปัจจุบัน
 - **Glenn Berry — SQL Server 2025 Diagnostic Queries** คือ baseline suite มาตรฐาน (ดาวน์โหลดจาก [glennsqlperformance.com/resources](https://glennsqlperformance.com/resources/)) — รันทั้งชุดแล้วเก็บผลเป็นไฟล์/spreadsheet เทียบเดือนต่อเดือน
 - บทบาท server ใหม่ (SQL Server 2022+) `##MS_ServerPerformanceStateReader##` ให้สิทธิ์อ่าน DMV ด้าน performance โดยไม่ต้อง sysadmin — ใช้กับ monitoring account เสมอ
 - **Query Store** คือ baseline ที่ดีที่สุดระดับ query (ต่อเวลา อัตโนมัติ) — ใช้คู่กับ wait stats ระดับ instance

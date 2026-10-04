@@ -4,6 +4,9 @@
 
 > *"ประสบการณ์ 10 ปี อาจกลายเป็น 1 ปี ที่ทำซ้ำ 10 รอบ — ถ้ายังใช้ความรู้ยุค 2012 จัดการ server ยุค 2025"*
 
+> **ต้องรู้มาก่อน**: เนื้อหาทั้งโมดูล — [1.1 Engine Architecture](../01_Engine_Architecture_SQLOS/README.md), [1.2 Scheduling](../02_Scheduling_Windows_vs_SQL/README.md), [1.3 NUMA](../03_NUMA_Architecture/README.md), [1.4 Wait Statistics](../04_Wait_Statistics/README.md)
+> ศัพท์ใหม่ดู [Glossary](../../../Glossary.md)
+
 ## เปิดเรื่อง: อะไรเปลี่ยนไป อะไรยังเหมือนเดิม
 
 แนวคิดพื้นฐานของหลักสูตรนี้ (SQLOS, Scheduling, Waits) ไม่เคยเปลี่ยน แต่รายละเอียดรอบ ๆ เปลี่ยนเร็ว ส่วนนี้สรุป "ของที่ต้องถอดออกจากสมอง" และ "ของใหม่ที่ต้องใส่เข้าไป" ตั้งแต่ SQL Server 2019 ถึง 2025
@@ -85,4 +88,4 @@ ALTER DATABASE SCOPED CONFIGURATION
 
 ---
 
-[⬅ Module 01](../../README.md) | [1.4 Wait Statistics](../04_Wait_Statistics/README.md) | 🧪 [Labs](../../Labs/README.md) | ➡ [Module 02 — I/O](../../Module_02_IO/README.md)
+[⬅ ก่อนหน้า: 1.4 Wait Statistics](../04_Wait_Statistics/README.md) | [📝 Quiz Bank](../../Quiz_Bank.md) | [🧪 Labs](../../Labs/README.md) | ➡ [Module 02 — I/O](../../Module_02_IO/README.md)

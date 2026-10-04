@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 ﻿-- Lab: Blocking Chain Simulation & Analysis
 -- à¸§à¸±à¸•à¸–à¸¸à¸›à¸£à¸°à¸ªà¸‡à¸„à¹Œ: à¸ˆà¸³à¸¥à¸­à¸‡à¸ªà¸–à¸²à¸™à¸à¸²à¸£à¸“à¹Œ Blocking à¹à¸¥à¸°à¸à¸¶à¸à¹ƒà¸Šà¹‰ Script à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸«à¸² Head Blocker
 -- à¸•à¹‰à¸­à¸‡à¹ƒà¸Šà¹‰ 2 Session à¹ƒà¸™à¸à¸²à¸£à¸£à¸±à¸™

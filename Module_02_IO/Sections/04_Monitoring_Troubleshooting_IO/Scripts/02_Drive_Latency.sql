@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- ============================================================
 -- Script: 03_Drive_Latency.sql
 -- Module: Module 02 - I/O Performance

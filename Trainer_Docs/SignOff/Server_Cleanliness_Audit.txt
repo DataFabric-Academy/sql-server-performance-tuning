@@ -1,0 +1,160 @@
+=== 1) user sessions/requests ค้าง ===
+session_id status req_status wait_type open_transaction_count last_request_start_time
+---------- ------ ---------- --------- ---------------------- -----------------------
+51 sleeping background BROKER_EVENTHANDLER 0 2026-10-02 03:09:43.330
+52 sleeping background ONDEMAND_TASK_QUEUE 0 2026-10-02 03:09:42.443
+53 sleeping NULL NULL 0 2026-10-02 06:39:34.710
+54 sleeping background BROKER_TRANSMITTER 0 2026-10-02 03:09:43.347
+55 sleeping NULL NULL 0 2026-10-03 02:46:10.897
+56 sleeping background HADR_FILESTREAM_IOMGR_IOCOMPLETION 0 2026-10-02 03:09:43.347
+57 sleeping background SLEEP_TASK 0 2026-10-02 03:09:43.347
+58 sleeping NULL NULL 0 2026-10-02 06:36:59.740
+59 sleeping sleeping NULL 0 2026-10-03 02:49:12.980
+60 sleeping NULL NULL 0 2026-10-03 02:46:33.307
+61 sleeping NULL NULL 0 2026-10-02 06:34:21.053
+62 sleeping NULL NULL 0 2026-10-02 06:30:34.660
+63 sleeping sleeping NULL 0 2026-10-03 02:50:13.000
+64 sleeping sleeping NULL 0 2026-10-03 02:50:13.000
+65 sleeping sleeping NULL 0 2026-10-03 02:50:13.000
+66 sleeping sleeping NULL 0 2026-10-03 02:50:13.000
+67 sleeping sleeping NULL 0 2026-10-03 02:50:13.000
+68 sleeping sleeping NULL 0 2026-10-03 02:50:13.000
+69 sleeping sleeping NULL 0 2026-10-03 02:50:13.000
+70 sleeping sleeping NULL 0 2026-10-03 02:40:12.823
+71 sleeping sleeping NULL 0 2026-10-03 02:40:12.823
+72 sleeping NULL NULL 0 2026-10-02 08:35:50.873
+73 sleeping sleeping NULL 0 2026-10-03 02:45:12.917
+74 sleeping sleeping NULL 0 2026-10-03 02:45:12.917
+75 sleeping sleeping NULL 0 2026-10-03 02:50:13.000
+76 sleeping sleeping NULL 0 2026-10-03 02:50:13.000
+77 sleeping sleeping NULL 0 2026-10-03 02:50:13.000
+78 sleeping NULL NULL 0 2026-10-02 08:55:19.257
+79 sleeping sleeping NULL 0 2026-10-03 02:50:13.000
+80 sleeping sleeping NULL 0 2026-10-03 02:50:13.003
+81 sleeping sleeping NULL 0 2026-10-03 02:50:13.003
+82 sleeping sleeping NULL 0 2026-10-03 02:50:13.003
+83 sleeping NULL NULL 0 2026-10-02 06:33:25.597
+84 sleeping sleeping NULL 0 2026-10-03 02:50:13.003
+85 running running NULL 0 2026-10-03 02:50:53.563
+92 sleeping NULL NULL 0 2026-10-02 06:36:29.037
+96 sleeping NULL NULL 0 2026-10-02 08:39:39.133
+
+=== 3) XE sessions (ต้องเหลือของระบบ) ===
+name create_time
+---- -----------
+hkenginexesession 2026-10-02 03:09:50.840
+system_health 2026-10-02 03:09:51.880
+sp_server_diagnostics session 2026-10-02 03:09:51.950
+telemetry_xevents 2026-10-03 02:21:32.290
+
+=== 3b) server_event_sessions ที่ถูกสร้างใหม่ ===
+Msg 207, Level 16, State 1, Server sql-01, Line 1
+Invalid column name 'is_auto_start'.
+=== 4) config drift: sys.databases flags ===
+name RCSI ADR OptLock QS compatibility_level
+---- ---- --- ------- -- -------------------
+AdventureWorks 1 0 0 1 170
+TestDB 0 0 0 1 170
+TSQL 0 0 0 1 170
+
+=== 4b) sys.configurations เกณฑ์หลัก ===
+name value_in_use
+---- ------------
+priority boost 0
+cost threshold for parallelism 5
+max degree of parallelism 4
+lightweight pooling 0
+optimize for ad hoc workloads 0
+
+=== 7) SQL Server Agent ===
+servicename status_desc last_startup_time
+----------- ----------- -----------------
+SQL Server (MSSQLSERVER) Running 2026-10-02 03:09:35.2543684 +00:00
+SQL Server Agent (MSSQLSERVER) Stopped NULL
+
+=== 3b-corrected) server_event_sessions ===
+name
+----
+system_health
+AlwaysOn_health
+telemetry_xevents
+
+=== 2) orphan objects ใน AdventureWorks (ตารางรวม 71 เป้า) ===
+user_tables
+-----------
+72
+
+name
+----
+
+=== 2b) index แปลกปลอมใน Person.Person / Production ===
+tbl idx
+--- ---
+
+=== 2c) procs แปลกปลอม ===
+name
+----
+
+=== 5) QS hints + forced plans ค้าง ===
+Msg 208, Level 16, State 1, Server sql-01, Line 1
+Invalid object name 'sys.query_store_plan_hints'.
+=== 6) data integrity: Product 1 + ProductInventory 3 แถวแรก ===
+ProductID StandardCost ListPrice ModifiedDate
+--------- ------------ --------- ------------
+1 0.0000 0.0000 2025-02-07 10:01:36.827
+
+ProductID Quantity ModifiedDate
+--------- -------- ------------
+1 408 2025-08-07 00:00:00.000
+1 324 2025-08-07 00:00:00.000
+1 353 2025-08-07 00:00:00.000
+
+=== TestDB / TSQL คืออะไร ===
+name create_date can_access
+---- ----------- ----------
+TSQL 2026-10-02 04:42:19.073 1
+TestDB 2026-10-02 02:20:37.023 1
+
+tables_in_TestDB
+----------------
+5
+
+tables_in_TSQL
+--------------
+9
+
+=== QS hints ค้าง (sys.query_store_query_hints) ===
+hints
+-----
+0
+
+=== forced plans ค้าง ===
+forced
+------
+0
+
+=== DROP scratch DBs (TestDB, TSQL — สร้างโดย agents ระหว่างทดสอบ) ===
+Nonqualified transactions are being rolled back. Estimated rollback completion: 0%.
+Nonqualified transactions are being rolled back. Estimated rollback completion: 100%.
+name
+----
+AdventureWorks
+master
+model
+msdb
+tempdb
+
+(5 rows affected)
+
+=== VERDICT สุดท้าย (ตรวจโดยผู้ประสานงาน 2026-10-03) ===
+1. Sessions: สะอาด — ไม่มี request ค้าง, open transaction ทุก session = 0
+2. Objects: 72 ตาราง = 71 baseline + dbo.sysdiagrams (artifact มาตรฐาน SSMS — benign); ไม่มี index/proc แปลกปลอม
+3. XE: เหลือเฉพาะของระบบ (hkengine, system_health, sp_server_diagnostics, telemetry) + server_event_sessions ไม่มีเศษ
+4. Config: กลับ baseline ครบ (RCSI=1 เดิม, ADR=0, OptLock=0, QS=1 เดิม, CTFP=5, MAXDOP=4, ad-hoc=0, lightweight pooling=0, priority boost=0)
+5. Query Store: hints = 0, forced plans = 0 (view จริงบน build นี้คือ sys.query_store_query_hints)
+6. Data: Product 1 = 0.0000/0.0000 (วันที่แก้ไขเดิม 2025-02-07), ProductInventory 408/324/353 — rollback ครบทุกที่
+7. SQL Server Agent: Stopped (สถานะเดิมของ VM — แล็บที่ใช้ Agent ต้อง START ก่อนสอน)
+8. ของที่ลบเอง: database TestDB (5 ตาราง) + TSQL (9 ตาราง) — scratch DB ที่ agent สร้างระหว่างทดสอบ (create_date 2026-10-02) ไม่อยู่ใน baseline
+9. หมายเหตุ: engine restart 02 ต.ค. 03:09 พร้อม GDR → build ปัจจุบัน 17.0.1135.8 (ตรงบล็อกอ้างอิงของแล็บรอบหลังทั้งหมด)
+
+VERDICT: สะอาด — พร้อมใช้สอน/ทดสอบต่อ

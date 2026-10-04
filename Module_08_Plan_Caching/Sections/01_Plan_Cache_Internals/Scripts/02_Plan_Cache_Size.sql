@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- 02_Plan_Cache_Size.sql
 -- Check Plan Cache Size and Counts
 -- Source: SQLSkills

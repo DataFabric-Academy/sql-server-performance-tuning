@@ -25,6 +25,8 @@
 
 ### Step 1 — Session A: เปิด transaction แล้ว update โดยไม่ commit
 
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): คำสั่งวิเคราะห์ใน Step 3 ใช้ **CROSS APPLY / OUTER APPLY** (เรียก table-valued function ต่อท้ายแต่ละแถว เช่น `sys.dm_exec_sql_text` เพื่อดึงข้อความ SQL ของ request) และ **subquery** (`IN (SELECT blocking_session_id ...)`) — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
+
 ```sql
 -- Session A
 USE AdventureWorks2025;
@@ -77,11 +79,16 @@ WHERE s.session_id IN (
 ROLLBACK TRANSACTION;   -- Session B จะรันเสร็จทันที
 ```
 
+**Expected:** บน DB ที่ยังไม่เปิด RCSI หน้าต่าง B ค้างรอจน Session A ROLLBACK แล้วจึงรันเสร็จทันที; ระหว่างค้าง Session C เห็น blocking pair ที่ `wait_type = LCK_M_S` ชี้ `blocking_session_id` ไปที่ Session A และ query หา head blocker ระบุ session ที่ถือ transaction ค้างได้
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: DB บน VM ชื่อ `AdventureWorks` และ**เปิด RCSI อยู่แล้ว** (`is_read_committed_snapshot_on = 1`) — Step 2 จึง "ผ่านทันที" ไม่ block (อ่านค่า commit ล่าสุด 0.0000 ได้ใน ~0.5 วิ) หมายเหตุการสอน: ต้องจำลอง blocking read ด้วย `WITH (READCOMMITTEDLOCK)` จึงจับได้ `wait_type = LCK_M_S` รอ 2,123 ms ที่ `wait_resource = KEY: 5:72057594054049792 (8194443284a0)` โดย `blocking_session_id = 66` (spid ของ Session A) และถ้า Session B เป็น UPDATE จะ block ด้วย `LCK_M_X` ทำให้เห็น chain 2 ชั้น (spid 67 → 68 → 66) — หลัง A ROLLBACK ทุก session ปลอดและค่าข้อมูลไม่เปลี่ยน (บทเรียน: RCSI ทำให้ reader ไม่ block writer แต่ writer ยัง block writer)
+
 ---
 
 ## Exercise 2: Deadlock + Deadlock Graph
 
 ### Step 1 — Session A: lock ตารางแรกของวงจร
+
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): คำสั่งดึง Deadlock Graph ใน Step 4 ใช้ **derived table** (subquery ในวงเล็บตั้งชื่อ `AS d`), **CROSS APPLY** และ **XQuery** (`buf.nodes('//event[...]')` = แตก XML ออกเป็นแถวแล้วอ่านค่าด้วย `.value()`) — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
 
 ```sql
 -- Session A
@@ -131,6 +138,9 @@ ORDER BY deadlock_at DESC;
 
 ✅ **วิธีอ่าน**: คลิก XML link → SSMS แสดง **Deadlock Graph แบบภาพ** ระบุ victim (วงกลมมี ✗) และ resource ที่ชนกัน (List Price vs OrderQty ของ process ต่างคน)
 
+**Expected:** หนึ่ง session ได้ error **1205** (victim — transaction ถูก rollback อัตโนมัติ) อีก session ที่ถูก block อยู่รันต่อจนเสร็จและปิด transaction ได้ปกติ; Step 4 ดึง Deadlock Report ล่าสุดจาก `system_health` ได้ timestamp ตรงช่วงทดลอง พร้อม XML ระบุ victim และ resource ที่ชนกัน
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: deadlock เกิดจริง — Session A (spid 78) เป็น victim ได้ `Msg 1205, Level 13: Transaction (Process ID 78) was deadlocked on lock resources with another process and has been chosen as the deadlock victim`, Session B (spid 79) รอดและ ROLLBACK สะอาด (ค่าข้อมูลไม่เปลี่ยน, open transaction = 0) หมายเหตุ 2 ข้อจากการรัน: (1) บน build นี้ query ใน Step 4 ตามต้นฉบับคืน 0 แถวเพราะ `ring_buffer` ไม่เก็บ `xml_deadlock_report` ไว้ — ให้เปลี่ยนไปอ่านจาก event_file ด้วย `sys.fn_xe_file_target_read_file('system_health*.xel', NULL, NULL, NULL)` แล้ว `CROSS APPLY ... nodes('//event[@name="xml_deadlock_report"]')` พบรายงานเวลา 07:14:21.628 (เวลาเซิร์ฟเวอร์) victim = spid 78; (2) `x.value('(event/@timestamp)[1]', ...)` คืน NULL เพราะ path เป็น element ลูกที่ไม่มีจริง — ใช้ `(@timestamp)[1]` (attribute ของ event เอง) จึงจะได้เวลา
+
 ---
 
 ## Exercise 3: Isolation Levels — RCSI ลด blocking
@@ -166,15 +176,23 @@ WHERE database_id = DB_ID('AdventureWorks2025');
 
 ✅ **สรุปแนวคิด**: RCSI = reader ไม่ block writer / writer ไม่ block reader โดยใช้ row versioning — เหมาะกับ OLTP ทั่วไป; Snapshot Isolation ใช้เมื่อต้องการ consistency ระดับ transaction
 
+**Expected:** Session B SELECT ผ่านทันทีระหว่าง Session A ถือ X lock ค้าง โดยได้ค่า commit ล่าสุด (ไม่มี LCK wait); Step 3 เห็น version store ถูกใช้งานขณะ update ยังค้าง ส่วน SNAPSHOT transaction ต้องเปิด `ALLOW_SNAPSHOT_ISOLATION` ก่อนจึงรันได้
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: DB บน VM ชื่อ `AdventureWorks` และ**เปิด RCSI อยู่แล้ว** (`is_read_committed_snapshot_on = 1` — Step 1 ข้ามได้ และ**ห้ามรันซ้ำ**บน VM ทดสอบ) — ระหว่าง Session A (spid 65) ถือ update ค้าง Session B SELECT ผ่านใน ~0.7 วิ ได้ค่า 0.0000 (commit ล่าสุด) หมายเหตุจากการรัน: (1) Step 3 ตามต้นฉบับ error `Msg 207 Invalid column name 'active_transactions_using_pvs'` — คอลัมน์นี้มีเฉพาะ Azure SQL ไม่มีใน on-prem 2022/2025 (ตรวจตามเอกสาร Microsoft Learn) ให้ใช้ `SELECT database_id, persistent_version_store_size_kb/1024.0 AS pvs_mb FROM sys.dm_tran_persistent_version_store_stats` แทน ซึ่งคืน pvs_mb = 0 เพราะ ADR ปิด (PVS ใช้เมื่อเปิด ADR — DB นี้ versioning อยู่ที่ tempdb version store: ระหว่าง update ค้าง `sys.dm_tran_active_snapshot_database_transactions` และ `sys.dm_tran_version_store` มี 1 แถวจริง); (2) `ALLOW_SNAPSHOT_ISOLATION` บน VM ยัง OFF — เปิดตอนสอนด้วย `ALTER DATABASE ... SET ALLOW_SNAPSHOT_ISOLATION ON` (ทำบน VM เท่านั้น) แล้วผู้เรียนจะเห็น: `SET TRANSACTION ISOLATION LEVEL SNAPSHOT` + `BEGIN TRAN` แล้วอ่านได้ค่าก่อน update คงเดิมตลอด transaction แม้ Session A จบ tran ไปแล้ว (consistent snapshot — ถ้าพยายาม UPDATE แถวที่ถูกแก้ระหว่างทางจะพบ error 3960 update conflict)
+
 ---
 
 ## Exercise 4 (SQL Server 2025): Optimized Locking
+
+> **ทางเลือกสำหรับรุ่นเก่า:** Exercise นี้ต้องใช้ SQL Server 2025 (17.x) เท่านั้น — บน 2019/2022 ให้ข้ามไปทำ Wrap-up โดยอ่านผลจาก sign-off ด้านล่าง หรือกลับไปลงลึก Exercise 3 (Snapshot/RCSI) แทน
 
 ### Step 1 — เปิดใช้ (ปิด default ใน SQL Server 2025)
 
 ```sql
 USE master;
 GO
+-- Hard guard: ฟีเจอร์นี้มีเฉพาะ SQL Server 2025 (17.x) — รุ่นเก่าจะหยุดพร้อมข้อความบอกทาง
+IF CAST(SERVERPROPERTY('ProductMajorVersion') AS INT) < 17
+    THROW 51000, 'Optimized Locking ต้องใช้ SQL Server 2025 (17.x) — ทางเลือกรุ่นเก่า: ข้าม Exercise 4 นี้ แล้วทำ Exercise 3 (Snapshot/RCSI) ต่อ', 1;
 -- ต้องเปิด ADR ก่อน / ตอนรันต้องไม่มี connection อื่นต่อ DB นี้
 ALTER DATABASE AdventureWorks2025 SET ACCELERATED_DATABASE_RECOVERY = ON;
 ALTER DATABASE AdventureWorks2025 SET OPTIMIZED_LOCKING = ON;
@@ -204,6 +222,9 @@ WHERE request_session_id = <Session A spid>;
 ```sql
 ALTER DATABASE AdventureWorks2025 SET OPTIMIZED_LOCKING = OFF;
 ```
+
+**Expected:** ครบทั้ง 3 Step — Step 1: บน 17.x guard ผ่านเงียบ ๆ, `ALTER` สำเร็จ และ query คืน `is_optimized_locking_on = 1` (บนรุ่นเก่ากว่า 17: error 51000 พร้อมข้อความบอกทางเลือก) · Step 2: `sys.dm_tran_locks` ไม่มี row/page X lock ค้างของ Session A ขณะ tran เปิดอยู่ — เหลือแถว resource_type = `TRANSACTION ID` (TID lock) · Step 3: `ALTER ... OFF` สำเร็จ กลับสู่สถานะเดิม
+> อ้างอิงรันจริง SQL Server 2025 RTM (17.0.1000.7), 2026-10-01: เปิด ADR + OPTIMIZED_LOCKING สำเร็จ (`is_accelerated_database_recovery_on = 1, is_optimized_locking_on = 1`) และ revert กลับ 0 สะอาด — syntax guard `IF … THROW` ทดสอบแล้วผ่าน; หมายเหตุ: DB บน VM ทดสอบชื่อ `AdventureWorks` (แทนชื่อตามสภาพแวดล้อม) และ Step 2 ตรวจจริงด้วย pattern เดียวกับ Exercise 1 ของแล็บนี้ (สร้าง blocking คู่แล้วอ่าน `sys.dm_tran_locks`)
 
 ---
 

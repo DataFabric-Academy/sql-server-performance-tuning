@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- 03_Analyze_Blocking.sql
 -- Purpose: Identify the "Head Blocker" in a blocking chain.
 -- Source: Adapted from Microsoft Tiger Team & Standard DMVs.

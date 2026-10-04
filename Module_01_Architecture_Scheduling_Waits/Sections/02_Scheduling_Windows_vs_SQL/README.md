@@ -4,6 +4,9 @@
 
 > *"CPU หนึ่ง core รันได้ครั้งละหนึ่ง task เท่านั้น ทุกอย่างที่เหลือคือเรื่องของการจองคิว"*
 
+> **ต้องรู้มาก่อน**: [Section 1.1 — Engine Architecture & SQLOS](../01_Engine_Architecture_SQLOS/README.md) — รู้จักชั้นประมวลผลของ engine และบทบาทของ SQLOS ผู้จัดคิว CPU
+> ศัพท์ใหม่ดู [Glossary](../../../Glossary.md)
+
 ## เปิดเรื่อง: ทำไม DBA ต้องเข้าใจ Scheduler
 
 เวลา query ช้า หลายคนคิดถึง disk หรือ index ก่อน แต่คอขวดที่พบบ่อยอันดับต้น ๆ คือ **CPU scheduling** — และ SQL Server ไม่ได้ปล่อยให้ Windows จัดคิวให้ แต่สร้างระบบจัดคิวของตัวเองชื่อ **SQLOS Scheduler** คนที่เข้าใจกลไกนี้จะอ่านสัญญาณ CPU pressure ได้ก่อนคนอื่นหลายก้าว

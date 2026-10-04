@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- 03_Check_Stale_Stats.sql
 -- Identify out-of-date statistics using dm_db_stats_properties (per Glenn Berry 2025, Query 77)
 -- Based on: SQL Server 2025 Diagnostic Information Queries

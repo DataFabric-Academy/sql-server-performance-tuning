@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- ============================================================
 -- Script: 07_Top_Resource_Queries.sql
 -- Module: Module 11 - Troubleshooting

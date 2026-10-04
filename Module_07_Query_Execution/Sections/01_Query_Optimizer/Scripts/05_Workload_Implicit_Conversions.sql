@@ -1,3 +1,6 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+-- หมายเหตุ: บน SQL Server 2019/2022 ให้แก้ USE เป็น AdventureWorks2022 ก่อนรัน
+
 -- 05_Workload_Implicit_Conversions.sql
 -- Generate queries with implicit conversions for Demo Script 02_Find_Implicit_Conversions.sql
 -- Run this first, then run 02_Find_Implicit_Conversions.sql to see conversion warnings

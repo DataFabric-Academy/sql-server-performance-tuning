@@ -56,6 +56,9 @@ ORDER BY pages_kb DESC;
 
 ✅ **สังเกต**: `MEMORYCLERK_SQLBUFFERPOOL` ควรเป็นขาใหญ่ที่สุด — ถ้า clerk อื่น (เช่น `MEMORYCLERK_SQLQUERYEXEC`, `OBJECTSTORE_LOCK_MANAGER`) บวมผิดปกติ ให้ตามต่อ
 
+**Expected:** ได้ `system_memory_state_desc = Available physical memory is high` (OS ไม่กดดัน), `mem_util_pct` ระดับ 90–100 และ flag pressure ทั้งสอง = 0; Top-1 clerk ต้องเป็น `MEMORYCLERK_SQLBUFFERPOOL` — ถ้า clerk อื่นแซงขึ้นอันดับ 1 ให้สืบตาม clerk นั้นต่อ
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: RAM 16 GB (available ~10.2 GB), `sql_in_use_gb` ~1.0, `mem_util_pct = 100`, pressure = 0/0; Top clerk = `MEMORYCLERK_SQLBUFFERPOOL` ~327 MB ตามด้วย `CACHESTORE_SQLCP` ~140 MB — เครื่องว่างจึงค่ารวมน้อย ให้ดูสัดส่วน "ใครใหญ่ที่สุด" มากกว่าค่าสัมบูรณ์
+
 ---
 
 ## Exercise 2: Buffer Pool ต่อ Database (ใครกิน cache มากสุด)
@@ -100,11 +103,17 @@ WHERE object_name LIKE '%Buffer Node%'
 
 ✅ **เตือน**: อย่าใช้ PLE 300 วินาทีเป็นสายฟ้าแลบ — บนเครื่อง RAM หลายสิบ GB ค่าปกติอาจหลักหมื่นวินาที ให้ดู **trend ตกฮวบ** เทียบ baseline (Lab 10)
 
+**Expected:** database ที่ workload ใช้ล่าสุดจะกิน cache นำ (ที่นี่คือ AdventureWorks) และ tempdb ตามมาเป็นอันดับต้น ๆ; top object เปลี่ยนตาม query ล่าสุด ไม่ต้องตกใจถ้าลำดับไม่ตรงกับตัวอย่าง; PLE ต่อ node ระดับหลักพันขึ้นไปเป็นเรื่องปกติบนเครื่องที่ยังไม่กดดัน memory
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), 2026-10-02: AdventureWorks ~218 MB (27,961 pages), tempdb ~73 MB, RESOURCE DB ~22 MB; top object ช่วงนั้น = `xml_index_nodes_...` ~68 MB ตามด้วย `Person` ~32 MB, `SalesOrderDetail` ~19 MB; PLE node 000 = ~13,273 วินาที (1 NUMA node / 4 vCPU)
+
 ---
 
 ## Exercise 3: จำลอง Memory Spill + Memory Grant Feedback
 
 ### Step 1 — บังคับ sort ที่ต้อง spill ลง tempdb
+
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): บล็อกนี้ใช้ **window function** `ROW_NUMBER() OVER (ORDER BY (SELECT NULL))` — ให้เลขลำดับแถว 1, 2, 3, … โดยไม่มีเกณฑ์เรียงจริง ใช้แต่งคอลัมน์ `big_text` ให้ Sort ต้องจัดการค่าแบบ NVARCHAR(MAX) — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
+> ⚠️ **บน SQL Server 2025 (17.x) syntax เดิมของแล็บนี้ใช้ไม่ได้ 2 จุด** (ตรวจจริงบน 17.0.1135.8): (1) Step 2 — คอลัมน์ `sys.query_store_plan.is_memory_grant_feedback_adjusted` **ถูกถอดออกแล้ว** query จะ error `Invalid column name 'is_memory_grant_feedback_adjusted'` ให้ดู feedback จาก `sys.query_store_plan_feedback` แทน (ตัวอย่างผลจริงใน Expected ท้าย Exercise); (2) Step 3 — คอลัมน์ `total_granted_kb` / `total_used_kb` / `total_grantee_count` / `total_waiter_count` ของ `sys.dm_exec_query_resource_semaphores` เปลี่ยนชื่อเป็น `granted_memory_kb` / `used_memory_kb` / `grantee_count` / `waiter_count`
 
 ```sql
 USE AdventureWorks2025;
@@ -145,11 +154,16 @@ SELECT session_id, requested_memory_kb, granted_memory_kb,
 FROM sys.dm_exec_query_memory_grants;
 ```
 
+**Expected:** รอบแรก engine จ่าย grant ใหญ่เกินที่ใช้จริงมาก และกับข้อมูลเริ่มต้น (121K แถว) grant ยังครอบคลุมจึง**อาจไม่เห็น warning spill** — จะเห็นก็ต่อเมื่อ grant ถูกบีบด้วย memory pressure จาก workload คู่ขนาน; พอรันซ้ำ grant จะถูก Memory Grant Feedback หดลงชัดเจน และ Step 3 ขณะ instance ว่างต้องได้ `waiter_count = 0` กับ `dm_exec_query_memory_grants` ว่างเปล่า
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), 2026-10-02: รอบแรก grant 682,944 KB (~667 MB) แต่ใช้จริง `max_used_grant_kb = 12,160 KB` (~12 MB), `total_spills = 0`; รอบถัดไป grant ถูกปรับเหลือ 18,016 KB (~18 MB) และมีแถวใน `sys.query_store_plan_feedback` (feature_desc = `Memory Grant Feedback`, state = `FEEDBACK_VALID`); query จบ ~1.1–1.7 วิ (121,317 แถว); semaphore ขณะว่าง: `grantee_count = 0`, `waiter_count = 0`, `dm_exec_query_memory_grants` ว่าง
+
 ---
 
 ## Exercise 4 (Optional): In-Memory OLTP สั้น ๆ
 
 ### Step 1 — สร้าง memory-optimized table (ต้องมี filegroup)
+
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): บล็อกนี้เป็น **DDL** (`ALTER DATABASE ... ADD FILEGROUP ... CONTAINS MEMORY_OPTIMIZED_DATA` และ `CREATE TABLE ... WITH (MEMORY_OPTIMIZED = ON)`) ส่วน Step 2 ใช้ **WHILE** loop วน `INSERT` ทีละแถวแล้วจับเวลาด้วย `DATEDIFF` — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
 
 ```sql
 USE AdventureWorks2025;
@@ -181,6 +195,9 @@ SELECT DATEDIFF(MILLISECOND, @t, SYSUTCDATETIME()) AS insert_10k_ms;
 ```
 
 > **SQL Server 2025**: ถ้าเลิกใช้ Hekaton สามารถลบ memory-optimized filegroup ที่ว่างออกได้แล้ว (ฟีเจอร์ใหม่ใน 2025)
+
+**Expected:** ถ้าข้าม Step 1 (ยังไม่มี MEMORY_OPTIMIZED_DATA filegroup) การ `CREATE TABLE` จะ error 41337 ทันที; ทำครบทั้งสอง Step จะได้ `insert_10k_ms` ระดับไม่กี่ร้อยมิลลิวินาที เพราะ `DURABILITY = SCHEMA_ONLY` ไม่ต้อง flush log ต่อการ commit แต่ละครั้ง
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), 2026-10-02: เครื่องทดสอบของผู้เขียนถูกกติกาห้าม `ALTER DATABASE` จึงยังไม่มี filegroup และไม่ได้ตัวเลข MO โดยตรง — รันจริงได้ 2 ข้อค้น: (1) สร้าง `dbo.MO_Sessions` โดยไม่มี filegroup เกิด `Msg 41337: Cannot create memory optimized tables. To create memory optimized tables, the database must have a MEMORY_OPTIMIZED_FILEGROUP that is online and has at least one container.` (2) loop เดิม 10,000 แถว (autocommit ทีละแถว) บนตาราง disk-based รูปทรงเดียวกัน (temp table, drop ทิ้งแล้ว) ใช้ ~503 ms — ผู้เรียนที่ทำ Step 1 ครบจะได้ค่าแนวนี้หรือเร็วกว่า
 
 ---
 

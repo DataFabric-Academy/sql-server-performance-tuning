@@ -58,7 +58,7 @@ Thread หยุดทำงานเพราะต้องรอทรัพ�
 ---
 
 
-## ### 7.1 Scheduling — สิ่งที่เปลี่ยนใน SQL Server 2025
+### 7.1 Scheduling — สิ่งที่เปลี่ยนใน SQL Server 2025
 - **`lightweight pooling` (fiber mode) ถูกประกาศ deprecated ใน SQL Server 2025** และจะถูกถอดออกในรุ่นถัดไป — โมเดล Cooperative/Non-Preemptive Scheduling บน Worker Thread คือทางเดียวที่ Microsoft สนับสนุน อย่าเสียเวลาตั้งค่านี้บน production อีกต่อไป
 - **Hot Add CPU ถูก deprecated เช่นกัน** — วางแผนขนาด CPU ตั้งแต่ต้น (แนะนำใช้ Glenn Berry's diagnostic query "CPU/NUMA" เพื่อบันทึก topology ตั้งแต่วันแรกของระบบ)
 - Soft-NUMA ถูกสร้างอัตโนมัติตั้งแต่ SQL Server 2016+ เมื่อจำนวน logical core ต่อ NUMA node เกิน 8 — ตรวจสอบผลกระทบด้วย `sys.dm_os_nodes` (`node_state_desc` จะระบุ `ONLINE AUTOMATIC`)

@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- 07_High_IO_Queries.sql
 -- Top logical reads queries for entire instance (I/O-intensive)
 -- Based on: SQL Server 2025 Diagnostic Information Queries (Glenn Berry), Query 53

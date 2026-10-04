@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- ============================================================
 -- Script: 06_Active_Blocking.sql
 -- Module: Module 11 - Troubleshooting

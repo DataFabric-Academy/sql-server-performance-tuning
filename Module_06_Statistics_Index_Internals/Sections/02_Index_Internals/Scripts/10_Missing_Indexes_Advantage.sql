@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- 10_Missing_Indexes_Advantage.sql
 -- Missing index recommendations for current database (ranked by Index Advantage)
 -- Based on: SQL Server 2025 Diagnostic Information Queries (Glenn Berry), Query 72

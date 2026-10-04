@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 ﻿-- Lab: Creating a Persistent Baseline
 -- à¸§à¸±à¸•à¸–à¸¸à¸›à¸£à¸°à¸ªà¸‡à¸„à¹Œ: à¸ªà¸£à¹‰à¸²à¸‡à¸£à¸°à¸šà¸šà¹€à¸à¹‡à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥ Baseline à¸¥à¸‡ Table à¹€à¸žà¸·à¹ˆà¸­à¸”à¸¹à¹à¸™à¸§à¹‚à¸™à¹‰à¸¡à¸£à¸°à¸¢à¸°à¸¢à¸²à¸§ (Trending)
 

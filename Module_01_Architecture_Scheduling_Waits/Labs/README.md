@@ -72,6 +72,9 @@ WHERE scheduler_id < 1048576      -- visible schedulers เท่านั้น
 ORDER BY parent_node_id, scheduler_id;
 ```
 
+**Expected:** ได้แถวเท่ากับจำนวน visible schedulers (ปกติ = logical CPU count); ทุก scheduler `status = 'VISIBLE ONLINE'` และช่วง idle `runnable_tasks_count = 0`
+> อ้างอิงรันจริง SQL Server 2025 RTM (17.0.1000.7), AdventureWorks, 2026-10-01: 4 schedulers บน node 0 (1 NUMA node, 4 vCPU) + node 64 (DAC, ไม่แสดงใน query นี้เพราะ scheduler_id ≥ 1048576)
+
 ---
 
 ## Exercise 2: วัด Signal Wait Ratio (CPU Pressure Indicator) (Window A)
@@ -139,14 +142,24 @@ ORDER BY wait_s DESC;
 
 ✅ **สังเกต**: จด Top 5 ไว้เทียบกับผลหลังจากจำลอง workload
 
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): บล็อกนี้ใช้ **CTE** (`WITH Waits AS (...)` = ชุดผลลัพธ์ชั่วคราวตั้งชื่อไว้ใช้ใน query เดียวกัน) และ **window function** (`SUM(wait_s) OVER ()` = ผลรวมของทุกแถวโดยไม่ยุบแถว ใช้คิด % ต่อแถว) — อ่านนิยามเพิ่มได้ที่ [Glossary](../../Glossary.md)
+> **benign waits คืออะไร / ทำไมต้องกรอง**: wait types เช่น `SLEEP_TASK`, `XE_TIMER_EVENT`, `BROKER_*` เกิดจาก background task ของตัว SQL Server เอง สะสมนาน ๆ จะบวม Top waits จนปัญหาจริงจมหาย — บล็อก `WHERE wait_type NOT IN (...)` ใช้กรองรายชื่อพวกนี้ออกก่อนจัดอันดับ (รายชื่ออ้างแนวทาง Glenn Berry)
+
+**Expected:** `signal_wait_pct` ต่ำกว่า ~10–15% บน instance ปกติ; Top waits ก่อน workload มักถูกจังหวะ background/preemptive ops ไม่ใช่ `SOS_SCHEDULER_YIELD`
+> อ้างอิงรันจริง SQL Server 2025 RTM (17.0.1000.7), 2026-10-01: `signal_wait_pct = 3.9%`, Top-1 = `PREEMPTIVE_OS_CRYPTOPS` (77.1%) — และหลังรัน workload (Ex3) `SOS_SCHEDULER_YIELD` เพิ่มจาก 6,689 → 17,185 ครั้ง (signal 0.89s → 10.48s) แต่ `signal_wait_pct` รวมยังไม่ขยับเพราะถูกเจือด้วย `ASYNC_NETWORK_IO` จากการรันผ่าน WAN — ในห้องเรียน (localhost/LAN) จะเห็น `signal_wait_pct` พุ่งชัดกว่า
+
 ---
 
 ## Exercise 3: จำลอง CPU Pressure (Window B)
 
 ### Step 1 — รัน workload กิน CPU (คำนวณหนัก ๆ วนลูป)
 
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): `WHILE` = ลูปแบบ procedural ของ T-SQL ใช้ที่นี่เพื่อวนคำนวณเผา CPU จำลอง workload — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
+
 ```sql
 -- Window B: รันทิ้งไว้ (~60 วินาที) แล้วไปทำ Exercise 4 ที่ Window C
+SET NOCOUNT ON;   -- สำคัญ: ถ้าไม่ปิด NOCOUNT ทุก iteration จะส่ง "N rows affected" กลับ client
+                  -- บน client ที่ช้า/ไกล (WAN) session จะติด ASYNC_NETWORK_IO แทนการกิน CPU
 DECLARE @n BIGINT = 0, @i BIGINT = 0;
 WHILE @i < 500000000
 BEGIN
@@ -157,6 +170,7 @@ SELECT @n;
 ```
 
 > **Tip**: เปิด Window B ซ้ำ 2–3 หน้าต่างแล้วรันพร้อมกัน เพื่อให้กิน CPU ครบทุก scheduler
+> **ข้อควรระวังจากการรันจริง**: loop ที่มี `SET NOCOUNT ON` ไม่เขียน output ออกมาเลย ถ้าหลุด client ไปกลางทาง session ฝั่ง server จะ**รันต่อจนจบเงียบ ๆ** — ปิดทิ้งด้วย `KILL <session_id>` จาก Cleanup ก่อนทิ้ง VM
 
 ### Step 2 — ดู runnable queue แบบ real-time (Window C)
 
@@ -174,16 +188,23 @@ ORDER BY runnable_tasks_count DESC;
 
 ### Step 3 — ดู wait ของ session ที่กำลังรัน
 
+> **ต้องรู้ก่อน**: `CROSS APPLY sys.dm_exec_sql_text(...)` = เรียก table-valued function ต่อท้ายแต่ละแถวเพื่อดึงข้อความ SQL ของ request นั้น; `JOIN sys.dm_exec_sessions` = ตารางระดับ session ที่เก็บแอตทริบิวต์ของการเชื่อมต่อ
+> ⚠️ **ห้ามใช้ `r.is_user_process` กับ `sys.dm_exec_requests`** — คอลัมน์นี้ถูกถอดออกจาก `sys.dm_exec_requests` ใน SQL Server 2025 (ยังอยู่ที่ `sys.dm_exec_sessions`) — ตรวจจริงบน 17.0.1000.7 แล้ว query แบบเก่าจะ error `Invalid column name 'is_user_process'`
+
 ```sql
 SELECT r.session_id, r.status, r.wait_type, r.wait_time,
        r.last_wait_type, r.cpu_time, r.total_elapsed_time,
        LEFT(t.text, 80) AS running_sql
 FROM sys.dm_exec_requests AS r
+JOIN sys.dm_exec_sessions AS s ON s.session_id = r.session_id
 CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) AS t
-WHERE r.session_id <> @@SPID AND r.is_user_process = 1;
+WHERE s.is_user_process = 1 AND r.session_id <> @@SPID;
 ```
 
 ✅ **สังเกต**: `wait_type = SOS_SCHEDULER_YIELD` + `runnable_tasks_count > 0` = quantum exhaustion (หมดคิว 4 ms ต่อครั้งแล้วต้องต่อคิว)
+
+**Expected:** เห็นแถวของ workload sessions (Window B) โดย `status = running` หรือสลับกับ `SOS_SCHEDULER_YIELD`; บน server ที่มี schedulers มากกว่าจำนวน loop อาจยังไม่เห็นคิว
+> อ้างอิงรันจริง SQL Server 2025 RTM (17.0.1000.7), 2026-10-01: รัน 4 loops พร้อมกันบน 4 schedulers ได้ `runnable_tasks_count = 2` บน scheduler 0 (มีคิวจริง) และ cpu_time สะสมของแต่ละ session เพิ่มต่อเนื่อง
 
 ### Step 4 — วัดผลกระทบที่ Signal Waits หลัง workload จบ
 
@@ -191,6 +212,9 @@ WHERE r.session_id <> @@SPID AND r.is_user_process = 1;
 -- รันซ้ำคำสั่ง Step 1 ของ Exercise 2
 -- สังเกต signal_wait_pct สูงขึ้นชั่วคราว และ SOS_SCHEDULER_YIELD พุ่งใน Top waits
 ```
+
+**Expected:** `SOS_SCHEDULER_YIELD` ขยับขึ้นใน Top waits อย่างชัดเจน (จำนวนครั้ง + signal time) และ `signal_wait_pct` สูงขึ้นชั่วคราวบนเครื่องที่รัน workload หนัก
+> อ้างอิงรันจริง SQL Server 2025 RTM (17.0.1000.7), 2026-10-01: `SOS_SCHEDULER_YIELD` 6,689 → 17,185 ครั้ง, signal 0.89s → 10.48s; `signal_wait_pct` รวม 3.9% → 3.9% (ไม่ขยับเพราะวัดผ่าน WAN มี `ASYNC_NETWORK_IO` เจือมาก) — บนเครื่อง localhost ของห้องเรียนจะเห็น signal_wait_pct พุ่งชัด
 
 ---
 
@@ -216,6 +240,11 @@ WHERE session_id <> @@SPID;
 
 ✅ **สังเกต**: `ASYNC_NETWORK_IO` = SQL Server พร้อมส่งข้อมูล แต่ client/network รับไม่ทัน — ปัญหาอยู่ฝั่ง application ไม่ใช่ storage
 
+> **ต้องรู้ก่อน**: `CROSS JOIN` = ผสมทุกแถวกับทุกแถว (Cartesian product) ใช้ที่นี่เพื่อสร้าง result set ใหญ่จำลองการส่งข้อมูลจำนวนมาก
+
+**Expected:** session ที่รัน query ใหญ่แสดง `status = suspended`, `wait_type = ASYNC_NETWORK_IO` ต่อเนื่อง (wait_time เดินขึ้นเรื่อย ๆ) ขณะ client ยังกลืนผลไม่ทัน
+> อ้างอิงรันจริง SQL Server 2025 RTM (17.0.1000.7), 2026-10-01: จับได้ session suspended/`ASYNC_NETWORK_IO` ระหว่างสตรีมผล `sys.all_objects CROSS JOIN sys.all_columns` และพบทั้ง chain จริงว่า session นี้ถือ lock ค้างไป **block คำสั่ง `ALTER DATABASE` ของ session อื่น (LCK_M_X)** — ใช้เป็นตัวอย่างสดว่า ASYNC_NETWORK_IO นำไปสู่ blocking ได้
+
 ---
 
 ## Wrap-up: คำถามท้ายแล็บ
@@ -227,7 +256,12 @@ WHERE session_id <> @@SPID;
 ## Cleanup
 
 ```sql
--- Reset wait stats (ทำเฉพาะบน VM ทดสอบ — ห้ามรันบน Production เพราะค่าสะสมจะหาย)
+-- 1) ปิด session ของ workload ที่อาจค้าง (loop แบบ NOCOUNT ON ไม่เขียน output
+--    จึงไม่รู้ว่า client หลุด และจะรันต่อจนจบเงียบ ๆ — เช็คจาก sys.dm_exec_requests)
+SELECT session_id, wait_type, cpu_time FROM sys.dm_exec_requests WHERE session_id > 50;
+-- KILL <session_id>;  -- ถ้ายังเห็น workload ค้างอยู่
+
+-- 2) Reset wait stats (ทำเฉพาะบน VM ทดสอบ — ห้ามรันบน Production เพราะค่าสะสมจะหาย)
 DBCC SQLPERF('sys.dm_os_wait_stats', CLEAR);
 ```
 

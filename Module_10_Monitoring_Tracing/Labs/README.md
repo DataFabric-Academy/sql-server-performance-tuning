@@ -23,6 +23,8 @@
 
 ## Exercise 1: สร้างโครงสร้าง Baseline
 
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): ขั้นนี้ใช้ **DDL สร้างโครงสร้าง** (`CREATE DATABASE`, `CREATE TABLE` = สร้างฐานข้อมูล/ตาราง), `CREATE OR ALTER PROCEDURE` (สร้างหรือแทนที่ stored procedure ในคำสั่งเดียว) และ `INSERT ... SELECT` (คัดลอกผลจาก DMV ลงตารางทีเดียวทั้งชุด) — Step 3 ใช้ระบบ stored procedures ของ SQL Server Agent (`sp_add_job` ฯลฯ) ลงทะเบียน job ตามตารางเวลา — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
+
 ### Step 1 — สร้าง DB และตารางเก็บ snapshot
 
 ```sql
@@ -103,11 +105,17 @@ GO
 
 > **แนะนำเพิ่ม**: Database Mail + Operator เพื่อแจ้งเตือนเมื่อ job fail (`sp_add_operator`, `sp_update_job @notify_level_email = 2`)
 
+**Expected:** หลัง Step 2 เห็น `WaitSnapshot` ถูกเติมหลักร้อยแถว (1 แถวต่อ wait type ที่มีค่าสะสม) และ `FileIOSnapshot` 1 แถวต่อไฟล์ข้อมูล/log ของทุก DB; หลัง Step 3 เห็น job "DBA - Baseline Snapshot" ใต้ SQL Server Agent → Jobs ใน Object Explorer พร้อม schedule "Every 15 min" — ถ้า Agent ยัง Stopped ต้อง START ก่อน แล้ว View History จะแสดง success ทุกรอบที่ Agent สั่งรัน
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: snapshot แรกได้ WaitSnapshot 143 แถว / FileIOSnapshot 19 แถว (Top read = AdventureWorks ROWS 3,702 reads) — บน VM ทดสอบพบ SQL Server Agent = Stopped (ตรวจจาก `sys.dm_server_services`) ขั้นสร้าง job จึงกำหนดให้ **รันจริงตอนสอนบน VM** เพื่อไม่ทิ้ง job/schedule ค้างบนเครื่อง
+
 ---
 
 ## Exercise 2: จำลอง Workload แล้วอ่าน Delta
 
 ### Step 1 — สร้างโหลดผสม (รันในหลายหน้าต่าง ~2 นาที)
+
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): Step 1 ใช้ **WHILE** loop (วนซ้ำใน T-SQL), `WAITFOR DELAY` (หน่วงเวลา 0.3 วิ/รอบ) และ `UPDATE TOP (n)` (อัปเดตจำกัดจำนวนแถว); Step 2 ใช้ **CTE** + window function `ROW_NUMBER() OVER (PARTITION BY WaitType ORDER BY SnapshotId ...)` = จัดลำดับแยกกลุ่มต่อ WaitType เพื่อหาแถว "จับครั้งแรก" กับ "จับครั้งล่าสุด" ของแต่ละ wait type — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
+> **หมายเหตุ VM ทดสอบ**: ถ้า `USE AdventureWorks2025;` ขึ้น error ว่า database ไม่มีอยู่ ให้เปลี่ยนเป็น `USE AdventureWorks;` (ชื่อจริงบน VM ทดสอบของหลักสูตร)
 
 ```sql
 USE AdventureWorks2025;
@@ -127,29 +135,35 @@ END
 
 ### Step 2 — จับ snapshot ที่สอง แล้วคำนวณ delta
 
+> ⚠️ **แก้จากต้นฉบับ**: query เดิม (`ROW_NUMBER() OVER (ORDER BY SnapshotId DESC)` ไม่มี `PARTITION BY` คู่กับเงื่อนไข `s.SnapshotId = MAX(SnapshotId)`) เทียบแถวล่าสุดกับตัวมันเอง ผลลัพธ์จึง **ว่างเปล่าเสมอ** — ด้านล่างแก้เป็นเทียบ "จับครั้งแรก vs ครั้งล่าสุด" ของแต่ละ WaitType (ตรวจจริงบน 17.0.1135.8 แล้ว query เดิมได้ 0 แถว)
+
 ```sql
 USE DBA_Baseline;
 EXEC dbo.CaptureBaselineSnapshot;
 
--- Top waits ในช่วงระหว่าง snapshot 2 ตัวล่าสุด
-WITH FirstSnap AS (
+-- Top waits ที่เพิ่มขึ้นระหว่างจับครั้งแรก → ครั้งล่าสุด (ของแต่ละ WaitType)
+WITH Snap AS (
     SELECT WaitType, WaitingTasksCount, WaitTimeMs, SignalWaitTimeMs,
-           ROW_NUMBER() OVER (ORDER BY SnapshotId DESC) AS rn
+           ROW_NUMBER() OVER (PARTITION BY WaitType ORDER BY SnapshotId ASC)  AS rn_first,
+           ROW_NUMBER() OVER (PARTITION BY WaitType ORDER BY SnapshotId DESC) AS rn_last
     FROM dbo.WaitSnapshot
 )
 SELECT f.WaitType,
-       s.WaitingTasksCount - f.WaitingTasksCount AS waits_delta,
-       s.WaitTimeMs - f.WaitTimeMs AS wait_ms_delta,
-       (s.WaitTimeMs - f.WaitTimeMs)
-           / NULLIF(s.WaitingTasksCount - f.WaitingTasksCount, 0) * 1.0 AS avg_wait_ms
-FROM dbo.WaitSnapshot AS s
-JOIN FirstSnap AS f ON f.WaitType = s.WaitType AND f.rn = 1
-WHERE s.SnapshotId = (SELECT MAX(SnapshotId) FROM dbo.WaitSnapshot)
-  AND s.WaitingTasksCount - f.WaitingTasksCount > 0
+       l.WaitingTasksCount - f.WaitingTasksCount AS waits_delta,
+       l.WaitTimeMs - f.WaitTimeMs AS wait_ms_delta,
+       (l.WaitTimeMs - f.WaitTimeMs)
+           / NULLIF(l.WaitingTasksCount - f.WaitingTasksCount, 0) * 1.0 AS avg_wait_ms
+FROM Snap AS f
+JOIN Snap AS l ON l.WaitType = f.WaitType
+WHERE f.rn_first = 1 AND l.rn_last = 1
+  AND l.WaitingTasksCount > f.WaitingTasksCount
 ORDER BY wait_ms_delta DESC;
 ```
 
 ✅ **ตีความ**: `SOS_SCHEDULER_YIELD` = CPU, `PAGEIOLATCH_*` = disk read, `WRITELOG` = log write latency, `LCK_M_*` = blocking — นี่คือการอ่าน baseline ที่แท้จริง
+
+**Expected:** ได้ตาราง delta ต่อ wait type — Top ของ `wait_ms_delta` บนเครื่องที่มี background เยอะมักถูก wait ประเภท dispatcher/queue ครอง ให้โฟกัสกลุ่มที่ตรงกับ workload ของเรา: `WRITELOG` นำจาก UPDATE ต่อรอบ ตามด้วย `SOS_SCHEDULER_YIELD`/`CX*` จาก scan และ `PAGELATCH_*`/`LCK_M_*` (เทียบ `FileIOSnapshot` จะเห็น log writes เพิ่มสอดคล้องกัน)
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: หน้าต่างวัด ~90 วิ (workload 150 รอบ ≈ 56 วิ) — workload-relevant: `WRITELOG` +199 ครั้ง (+272 ms, ~1 ms/ครั้ง), `SOS_SCHEDULER_YIELD` +2,581 ครั้ง, `CXPACKET`/`CXCONSUMER` +139/+1,108 ครั้ง, `PAGELATCH_EX` +24 ครั้ง; log ของ AdventureWorks +490 writes (io_stall_write +567 ms) — ส่วน Top ของตารางเป็น background (`DISPATCHER_QUEUE_SEMAPHORE`, `LOGMGR_QUEUE`) เพราะ server ทดสอบมี agent อื่นใช้ร่วม ค่าจึงเป็นโดยประมาณ
 
 ---
 
@@ -195,6 +209,9 @@ ORDER BY last_backup;
 
 1. ดาวน์โหลด **SQL Server 2025 Diagnostic Queries** จาก [glennsqlperformance.com/resources](https://glennsqlperformance.com/resources/)
 2. รันใน SSMS → `Query → Results to File` แล้วเก็บผลรายวันเทียบ spreadsheet ที่แนบมากับสคริปต์
+
+**Expected:** Step 1 ได้ 6 result sets: เวอร์ชัน + เวลา restart, สถานะ memory ของ OS (`Available physical memory is high` + จำนวน GB ว่าง), memory utilization ของ SQL process, จำนวน scheduler ที่มีคิวค้าง (ปกติ = 0 บนเครื่องว่าง), รายชื่อ DB ที่ Query Store ปิด (ควรว่าง) และ last backup ต่อ DB — แถวใด `last_backup = NULL` = ยังไม่เคย backup เลย; Step 2 ควรได้ไฟล์ผลลัพธ์ต่อวันเก็บไว้เทียบ
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: last_restart 2026-10-02 03:09, avail_gb ≈ 9.9 (state = high), `memory_utilization_percentage = 100` แต่ `process_physical_memory_low = 0` (SQL ใช้เต็ม target memory ของตัวเอง ไม่ใช่ RAM เครื่องหมด), runnable queue = 1 (ช่วงวัดมี agent อื่นรัน CPU loop), DB ที่ QS ปิด = ไม่มี, last_backup ทุก user DB = NULL (ยังไม่เคย backup)
 
 ---
 

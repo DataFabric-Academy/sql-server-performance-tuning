@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- ============================================================
 -- Script: 03_VLF_Analysis.sql
 -- Module: Module 03 - Database Structures

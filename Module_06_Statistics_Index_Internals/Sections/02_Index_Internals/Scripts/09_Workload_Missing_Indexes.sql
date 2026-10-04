@@ -1,3 +1,6 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+-- หมายเหตุ: บน SQL Server 2019/2022 ให้แก้ USE เป็น AdventureWorks2022 ก่อนรัน
+
 -- 09_Workload_Missing_Indexes.sql
 -- Generate workload that will trigger missing index recommendations
 -- Run this first, then run 10_Missing_Indexes_Advantage.sql to see recommendations

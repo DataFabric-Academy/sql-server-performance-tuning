@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- Lab: CPU Stress Test (Simulate High CPU)
 -- วัตถุประสงค์: สร้าง Workload ที่ใช้ CPU สูงเพื่อทดสอบ Scheduler Running/Runnable queues
 -- คำแนะนำ: รันสคริปต์นี้ใน New Query Window หลายๆ หน้าต่าง (3-4 Sessions) พร้อมกัน

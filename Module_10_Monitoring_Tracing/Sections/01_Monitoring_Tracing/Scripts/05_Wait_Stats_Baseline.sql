@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 /*
     SCRIPT: 05_Wait_Stats_Baseline.sql
     [CRITICAL]: EXECUTE IN MASTER (Server Scope DMV)

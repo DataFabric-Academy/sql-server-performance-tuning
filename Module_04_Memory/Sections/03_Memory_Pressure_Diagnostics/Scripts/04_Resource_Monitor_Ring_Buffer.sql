@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 /*
     Script: Monitor Resource Monitor Activity (Ring Buffer)
     Module: 04 - Memory

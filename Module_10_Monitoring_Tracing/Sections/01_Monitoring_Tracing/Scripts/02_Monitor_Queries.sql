@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- 02_Monitor_Queries.sql
 -- Optimized Monitor: "Mini-WhoIsActive"
 -- Purpose: See what is currently running on the server.

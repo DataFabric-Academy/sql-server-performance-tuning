@@ -23,6 +23,7 @@
 |---|---------|
 | 1 | [XE Core Concepts](Sections/01_XE_Core_Concepts/README.md) |
 | 2 | [Working With Extended Events](Sections/02_Working_With_Extended_Events/README.md) |
+| 📋 | [Quiz Bank — ทบทวน 15 คำถามพร้อมเฉลย](Quiz_Bank.md) |
 
 ---
 
@@ -55,11 +56,14 @@ Lightweight และ Scalable กว่า มีผลกระทบต่อ
 ---
 
 
-## - **Time-bound Extended Event Sessions (ใหม่ใน 2025)** — ตั้งเวลาหยุด session อัตโนมัติ (`AUTO_STOP` / duration option) ป้องกันลืมปิด session จนกิน resource สร้างข้อมูลกองใหญ่:
+- **การจำกัดอายุ session กันลืมปิด** — XEvents ไม่มี `AUTO_STOP` ในตัว (ตรวจจริงบน 17.0.1000.7: `WITH (AUTO_STOP = ON)` ได้ `Incorrect syntax near 'AUTO_STOP'`) วิธีจริงคือจำกัดขนาด target + ปิดตามเวลาด้วย SQL Agent job:
   ```sql
   CREATE EVENT SESSION [XE_Timed] ON SERVER
   ADD EVENT sqlserver.sql_batch_completed
-  WITH ( AUTO_STOP = ON );   -- 2025: ตั้งเวลา/หยุดเองได้
+  ADD TARGET package0.ring_buffer ( SET max_memory = 2048 )
+  WITH ( MAX_DISPATCH_LATENCY = 5 SECONDS );
+  -- ปิดตามเวลาด้วย SQL Agent job:
+  ALTER EVENT SESSION [XE_Timed] ON SERVER STATE = STOP;
   ```
 - SQL Profiler / SQL Trace: **อย่าใช้** — deprecated มายาวนาน และถูกถอดออกจากเครื่องมือหลักแล้ว มาตรฐานปัจจุบันคือ XEvents 100%
 - `ring_buffer` ใช้ดูสด/แก้ปัญหาจุดเดียว แต่ production capture จริงควรใช้ **event_file** + `MAX_FILE_SIZE` + `MAX_DISPATCH_LATENCY` ต่ำ ๆ เพื่อไม่สูญข้อมูลช่วง crash

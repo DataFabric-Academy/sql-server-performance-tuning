@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 ﻿/*
     LAB: Module 05 - Snapshot Isolation vs Locking
     

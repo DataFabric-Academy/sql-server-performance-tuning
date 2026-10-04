@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 /*
     SCRIPT: 06_Create_XE_LongQueries.sql
     [CRITICAL]: EXECUTE IN MASTER context (XE Sessions are Server Objects)

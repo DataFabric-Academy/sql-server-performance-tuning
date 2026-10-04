@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- 04_Index_Analysis_QueryStore.sql
 -- Source: Adpated from phakkhaphong/SQL-Server-Performance
 -- Purpose: Find Missing Indexes using Query Store data (more reliable than DMV alone).

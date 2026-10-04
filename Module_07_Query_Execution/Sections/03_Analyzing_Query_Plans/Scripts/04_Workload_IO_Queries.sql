@@ -1,3 +1,6 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+-- หมายเหตุ: บน SQL Server 2019/2022 ให้แก้ USE เป็น AdventureWorks2022 ก่อนรัน
+
 -- 04_Workload_IO_Queries.sql
 -- Generate I/O-intensive queries for Demo Script 07_High_IO_Queries.sql
 -- Run this first, then run 07_High_IO_Queries.sql to see I/O usage

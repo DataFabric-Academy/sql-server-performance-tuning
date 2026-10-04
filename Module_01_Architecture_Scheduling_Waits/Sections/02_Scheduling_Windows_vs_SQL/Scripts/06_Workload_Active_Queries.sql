@@ -1,3 +1,6 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+-- หมายเหตุ: บน SQL Server 2019/2022 ให้แก้ USE เป็น AdventureWorks2022 ก่อนรัน
+
 -- 06_Workload_Active_Queries.sql
 -- Generate active queries for Demo Script 03_Current_Executing_Requests.sql
 -- Run this in a separate session, then run 03_Current_Executing_Requests.sql in another window

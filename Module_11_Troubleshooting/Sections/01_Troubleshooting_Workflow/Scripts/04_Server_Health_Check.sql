@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- ============================================================
 -- Script: 04_Server_Health_Check.sql
 -- Module: Module 11 - Troubleshooting

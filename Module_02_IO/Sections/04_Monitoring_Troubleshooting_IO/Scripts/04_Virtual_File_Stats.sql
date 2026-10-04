@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- 04_Virtual_File_Stats.sql
 -- Analyze I/O Latency by Database File (modern view)
 -- Based on: SQL Server 2025 Diagnostic Information Queries (Glenn Berry)

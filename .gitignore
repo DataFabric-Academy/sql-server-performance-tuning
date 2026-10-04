@@ -81,3 +81,17 @@ docs/_build/
 
 # ZCode plan files
 .zcode/
+
+# ============================================
+# Trainer Deliverables (course production output) — policy per Production Plan open question #3
+# ============================================
+!Trainer_Docs/Production_Plan_Course_and_Slides.md
+!Trainer_Docs/Slide_Blueprints/
+!Trainer_Docs/Slide_Blueprints/**
+!Trainer_Docs/SignOff/
+!Trainer_Docs/SignOff/**
+!Trainer_Docs/Decks/
+!Trainer_Docs/Decks/**
+!Trainer_Docs/build_decks.py
+!Trainer_Docs/_template_work.pptx
+~$*

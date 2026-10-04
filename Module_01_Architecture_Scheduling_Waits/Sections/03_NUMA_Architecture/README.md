@@ -4,6 +4,9 @@
 
 > *"ถ้าข้อมูลอยู่ memory ของ node อื่น CPU ต้องเดินไปเอาเอง — และการเดินนั้นมีค่าใช้จ่าย"*
 
+> **ต้องรู้มาก่อน**: [Section 1.1 — Engine Architecture & SQLOS](../01_Engine_Architecture_SQLOS/README.md) (ชั้นประมวลผลของ engine) และ [Section 1.2 — Scheduling](../02_Scheduling_Windows_vs_SQL/README.md) (scheduler, worker, quantum)
+> ศัพท์ใหม่ดู [Glossary](../../../Glossary.md)
+
 ## เปิดเรื่อง
 
 เมื่อ server มี CPU หลาย socket คำถามสถาปัตยกรรมแรกคือ "memory ตัวไหนอยู่ใกล้ CPU ตัวไหน" ในระบบ **SMP (Symmetric Multiprocessing)** CPU ทุกตัวแชร์ bus เดียวไปยัง memory เดียว — ยิ่ง CPU เยอะ bus ยิ่งแน่น ทางออกคือ **NUMA (Non-Uniform Memory Access)**: แบ่ง CPU+Memory เป็น **Node** ที่เข้าถึง memory ใน node ตัวเองเร็ว (Local Access) แต่เข้าถึง node อื่นช้ากว่า (Foreign Access)

@@ -26,6 +26,8 @@ Adventure Works จะติดตั้ง server ใหม่ให้ Prosewa
 
 ### Step 1 — เปิดโหมดวัดผล I/O และ Execution Plan
 
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): `SET STATISTICS IO, TIME ON` สั่งให้ SQL Server รายงานจำนวน page ที่อ่านและเวลา CPU ท้ายแท็บ **Messages**; `CHECKPOINT` = บังคับเขียน dirty pages ลงดิสก์ และ `DBCC DROPCLEANBUFFERS` = คำสั่งตระกูล **DBCC** (ต้องเป็น sysadmin) ล้าง clean pages ออกจาก buffer pool เพื่อจำลอง cold cache — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
+
 ```sql
 USE AdventureWorks2025;
 GO
@@ -53,11 +55,16 @@ GO
 
 ✅ **สังเกต**: `physical reads = 0` แต่ `logical reads` เท่าเดิม — logical reads คือตัวชี้วัดงานของ query ไม่ใช่ disk
 
+**Expected:** cold run หลัง `DBCC DROPCLEANBUFFERS` ต้องเห็น `physical reads` + `read-ahead reads` สูงในแท็บ Messages ส่วน warm run ต้องได้ `physical reads = 0` และ `read-ahead reads = 0` โดย `logical reads` เท่าเดิมทุกครั้ง — logical reads วัดงานของ query ไม่ผันแปรตาม cache
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-01: cold = logical reads 274, physical reads 1, read-ahead reads 272 (`COUNT(*)` เลือกอ่าน NC index ที่แคบที่สุด ~274 pages ไม่ใช่ clustered index ~1,245 pages), warm = logical reads 274, physical reads 0, read-ahead reads 0
+
 ---
 
 ## Exercise 2: ทดสอบ Storage ด้วย DiskSpd (Command Prompt)
 
 ### Step 1 — สร้างไฟล์ทดสอบ 2 GB
+
+> **ต้องรู้ก่อน** (ไม่ใช่ T-SQL — รันระดับ OS): `fsutil` และ `diskspd` เป็น command-line utility ของ Windows รันใน Command Prompt/PowerShell บนเครื่อง VM โดยตรงเท่านั้น (รันใน SSMS ไม่ได้); `fsutil file createnew` สร้างไฟล์ว่างขนาดที่กำหนดล่วงหน้า เพื่อไม่ให้เวลาสร้างไฟล์ปนมาในผลวัด — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
 
 ```bat
 fsutil file createnew D:\Temp\sqltest.dat 2147483648
@@ -96,11 +103,16 @@ diskspd -c2G -d60 -s -w100 -t1 -o8 -b64K -Sh -h D:\Temp\sqltest.dat
 | avg latency (log write) | < 5 ms |
 | 64K sequential MB/s | สูงกว่า random หลายเท่า |
 
+**Expected:** อ่านแถว `total` ท้ายรายงาน diskspd — จับ IOPS, MB/s และ avg latency (ms) ไปเทียบตารางเกณฑ์ด้านบน; 8K random ต้องได้ IOPS สูงแต่ MB/s ต่ำ ส่วน 64K sequential ต้องได้ MB/s สูงกว่า random หลายเท่า — **DiskSpd ต้องรันบน VM ตรง ๆ ตอนสอน** (เป็น EXE ระดับ VM รันผ่าน remote session ไม่ได้)
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-01: ไม่ได้รัน DiskSpd — ใช้ `sys.dm_io_virtual_file_stats` ของ storage เดียวกัน (VM มี drive C:\ เดียว) เป็นค่าอ้างแทน: avg latency ~1 ms ตอน idle → ~29 ms ช่วงโหลดเขียนหนักของ Exercise 3 (ค่าโดยประมาณ ช่วงที่ VM มี workload อื่นร่วมด้วย)
+
 ---
 
 ## Exercise 3: วิเคราะห์ I/O จริงต่อไฟล์ (SSMS)
 
 ### Step 1 — เก็บสถิติ latency ต่อไฟล์ทั้ง instance (สไตล์ Glenn Berry)
+
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): `sys.dm_io_virtual_file_stats(NULL, NULL)` คือ DMF ที่รับ (database_id, file_id) โดย NULL = ทุก database/ทุกไฟล์ และต้อง JOIN `sys.master_files` เพื่อแปลง id เป็นชื่อไฟล์; `NULLIF(x, 0)` คืน NULL เมื่อ x = 0 เพื่อกันหารด้วยศูนย์; Step 2 ยังใช้ `WHILE` loop + `UPDATE TOP (100)` สร้างโหลดเขียน — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
 
 ```sql
 SELECT DB_NAME(vfs.database_id) AS database_name,
@@ -127,7 +139,7 @@ DECLARE @i INT = 0;
 WHILE @i < 200
 BEGIN
     UPDATE TOP (100) Sales.SalesOrderDetail
-    SET ModifiedDate = DATEADD(MINUTE, @i, OrderDate)
+    SET ModifiedDate = DATEADD(MINUTE, @i, ModifiedDate)  -- แก้จาก OrderDate (ไม่มีใน SalesOrderDetail — อยู่ที่ SalesOrderHeader)
     WHERE SalesOrderDetailID % 500 = (@i % 500);
     SET @i += 1;
 END
@@ -160,6 +172,9 @@ JOIN sys.master_files AS mf
 GROUP BY UPPER(LEFT(mf.physical_name, 3))
 ORDER BY avg_latency_ms DESC;
 ```
+
+**Expected:** ระหว่าง/หลังโหลด `num_of_writes` ของไฟล์ LOG ต้องเพิ่มเร็วที่สุด (เขียน log ทุกครั้งที่ commit) ส่วนไฟล์ ROWS ถูกเขียนทีหลังตอน checkpoint/lazywriter; ค่า latency เป็นค่าเฉลี่ยสะสมตั้งแต่ startup จึงพุ่งชัดตอนโหลดแล้วค่อย ๆ เจือจาง — และ Step 4 ต้องเห็น latency รวมระดับ drive เรียงจากแย่สุด
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-01: workload (200 รอบ) ใช้เวลา 22 วินาที — ก่อนโหลด ROWS 194 writes / LOG 743 writes (avg write ~0–1 ms); หลังโหลด LOG 1,759 writes (+1,016, avg write ~1 ms), ROWS 2,257 writes (+2,063) avg write latency สะสมของ ROWS พุ่ง ~87 ms แล้วเหลือ ~78 ms หลังผ่านไป ~1 นาที, latency ระดับ drive C:\ ~1 → ~29 ms (ค่าโดยประมาณ ช่วงที่ VM มี workload อื่นร่วมด้วย)
 
 ---
 

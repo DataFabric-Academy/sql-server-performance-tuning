@@ -1,0 +1,21 @@
+=== M5 TEST: OPTIMIZED_LOCKING on SQL Server 2025 (17.0.1000.7) ===
+name is_accelerated_database_recovery_on is_optimized_locking_on
+---- ----------------------------------- -----------------------
+AdventureWorks 1 1
+
+--- revert ---
+name is_accelerated_database_recovery_on is_optimized_locking_on
+---- ----------------------------------- -----------------------
+AdventureWorks 0 0
+
+=== M9 TEST: CREATE EVENT SESSION ... WITH (AUTO_STOP = ON) ===
+Msg 102, Level 15, State 33, Server sql-01, Line 1
+Incorrect syntax near 'AUTO_STOP'.
+--- start/stop/drop test session ---
+Msg 15151, Level 16, State 28, Server sql-01, Line 1
+Cannot alter the event session 'XE_TimedCapture_Test', because it does not exist or you do not have permission.
+Msg 15151, Level 16, State 28, Server sql-01, Line 1
+Cannot alter the event session 'XE_TimedCapture_Test', because it does not exist or you do not have permission.
+Msg 15151, Level 16, State 26, Server sql-01, Line 1
+Cannot drop the event session 'XE_TimedCapture_Test', because it does not exist or you do not have permission.
+=== M9/M5 TESTS DONE ===

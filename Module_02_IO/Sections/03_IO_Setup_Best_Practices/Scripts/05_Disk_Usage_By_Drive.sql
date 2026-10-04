@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- 05_Disk_Usage_By_Drive.sql
 -- Check Disk Space Availability
 -- Source: Standard DMVs

@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- 09_Active_Transactions.sql
 -- Check Active Transactions
 -- Useful for finding "Sleeping" transactions that are holding locks.

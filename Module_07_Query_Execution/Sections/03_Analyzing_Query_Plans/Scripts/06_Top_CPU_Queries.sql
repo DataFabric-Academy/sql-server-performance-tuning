@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- 06_Top_CPU_Queries.sql
 -- Top worker time queries for entire instance (CPU-intensive)
 -- Based on: SQL Server 2025 Diagnostic Information Queries (Glenn Berry), Query 48

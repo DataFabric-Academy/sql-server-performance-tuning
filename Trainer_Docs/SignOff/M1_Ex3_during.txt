@@ -1,0 +1,53 @@
+=== column check: dm_exec_sessions.is_user_process ===
+name
+----
+is_user_process
+
+name
+----
+
+=== Ex3 Step2 retry: runnable queue DURING workload ===
+scheduler_id current_tasks_count runnable_tasks_count current_workers_count active_workers_count work_queue_count
+------------ ------------------- -------------------- --------------------- -------------------- ----------------
+0 10 0 25 10 0
+1 13 0 27 12 0
+2 12 0 26 11 0
+3 10 0 25 9 0
+
+=== Ex3 Step3 (2025-compatible, session_id > 50) ===
+session_id status wait_type wait_time last_wait_type cpu_time total_elapsed_time running_sql
+---------- ------ --------- --------- -------------- -------- ------------------ -----------
+67 suspended ASYNC_NETWORK_IO 0 ASYNC_NETWORK_IO 8066 73077 DECLARE @n BIGINT = 0, @i BIGINT = 0; WHILE @i < 500000000 B
+69 running NULL 0 MEMORY_ALLOCATION_EXT 5 5 SET NOCOUNT ON; SELECT r.session_id, r.status, r.wait_type, 
+
+=== Ex3 Step2 (3 concurrent loops on 4 schedulers): runnable queue ===
+scheduler_id current_tasks_count runnable_tasks_count current_workers_count active_workers_count work_queue_count
+------------ ------------------- -------------------- --------------------- -------------------- ----------------
+0 11 0 25 11 0
+1 12 0 27 11 0
+2 12 0 26 11 0
+3 11 0 25 10 0
+
+=== Ex3 Step3 FIXED (JOIN sys.dm_exec_sessions, is_user_process=1) ===
+session_id status wait_type wait_time last_wait_type cpu_time running_sql
+---------- ------ --------- --------- -------------- -------- -----------
+67 suspended ASYNC_NETWORK_IO 14 ASYNC_NETWORK_IO 31409 DECLARE @n BIGINT = 0, @i BIGINT = 0; WHILE @i < 500000
+84 suspended ASYNC_NETWORK_IO 18 ASYNC_NETWORK_IO 2337 DECLARE @n BIGINT = 0, @i BIGINT = 0; WHILE @i < 500000
+85 suspended ASYNC_NETWORK_IO 18 ASYNC_NETWORK_IO 1691 DECLARE @n BIGINT = 0, @i BIGINT = 0; WHILE @i < 500000
+
+=== Ex3 Step2 FINAL (4 NOCOUNT-ON loops on 4 schedulers): runnable queue ===
+scheduler_id current_tasks_count runnable_tasks_count current_workers_count active_workers_count work_queue_count
+------------ ------------------- -------------------- --------------------- -------------------- ----------------
+0 12 2 25 12 0
+1 12 0 27 11 0
+2 13 0 26 12 0
+3 10 0 25 9 0
+
+=== Ex3 Step3 FINAL (JOIN sys.dm_exec_sessions) ===
+session_id status wait_type wait_time last_wait_type cpu_time running_sql
+---------- ------ --------- --------- -------------- -------- -----------
+65 suspended ASYNC_NETWORK_IO 16 ASYNC_NETWORK_IO 2604 SET NOCOUNT ON; DECLARE @n BIGINT = 0, @i BIGINT = 0; W
+67 suspended ASYNC_NETWORK_IO 0 ASYNC_NETWORK_IO 1015 SET NOCOUNT ON; DECLARE @n BIGINT = 0, @i BIGINT = 0; W
+69 suspended ASYNC_NETWORK_IO 39 ASYNC_NETWORK_IO 899 SET NOCOUNT ON; DECLARE @n BIGINT = 0, @i BIGINT = 0; W
+84 suspended ASYNC_NETWORK_IO 1 ASYNC_NETWORK_IO 990 SET NOCOUNT ON; DECLARE @n BIGINT = 0, @i BIGINT = 0; W
+

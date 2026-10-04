@@ -14,7 +14,7 @@
 
 ---
 
----
+## 📚 Sections (สารบัญบทเรียน)
 
 
 ## 📚 Sections (สารบัญบทเรียน)
@@ -24,9 +24,9 @@
 | 1 | [Plan Cache Internals](Sections/01_Plan_Cache_Internals/README.md) |
 | 2 | [Plan Cache Troubleshooting](Sections/02_Plan_Cache_Troubleshooting/README.md) |
 | 3 | [Query Store Automatic Tuning](Sections/03_Query_Store_Automatic_Tuning/README.md) |
+| ✅ | [Quiz Bank — ทดสอบความเข้าใจ 15 ข้อ](Quiz_Bank.md) |
 
 ---
-
 
 ## 🧪 Labs
 
@@ -35,7 +35,9 @@
 ---
 
 
-## <details>
+## 🙋 คำถามที่พบบ่อย (FAQ)
+
+<details>
 <summary><b>1. Parameter Sniffing คืออะไร?</b></summary>
 ปรากฏการณ์ที่ SQL Server สร้าง Plan ตามค่า Parameter ครั้งแรกที่รัน ซึ่งอาจจะไม่เหมาะกับ Parameter ค่าอื่นในอนาคต (เช่น ครั้งแรก Data น้อย ได้ Nested Loop แต่ครั้งถัดไป Data เยอะ ก็ยังใช้ Nested Loop จนช้า)
 </details>
@@ -50,22 +52,15 @@
 เพราะการล้าง Cache จะทำให้ CPU Spike เนื่องจากต้อง Compile Query ใหม่ทั้งหมด (Compilation Storm) และเสีย Disk I/O เพื่ออ่าน Metadata ใหม่
 </details>
 
-
 ---
 
----
+### 8.x สรุปสิ่งใหม่ (SQL Server 2025) และแนวทางปฏิบัติ
 
-
-## ### 7.1 Plan Cache
-- **Optimized sp_executesql (ใหม่ใน 2025)** — ทำให้ batch ที่ส่งผ่าน `sp_executesql` เข้าสู่กระบวนการ compile แบบ serialize เหมือน stored procedure ช่วยลด **compilation storms** (โหลด compile พร้อมกันจำนวนมาก เช่น หลัง failover หรือ cache flush) — เปิดผ่าน sp_configure หรือ database scoped configuration
+- **Optimized sp_executesql (ใหม่ใน 2025)** — ทำให้ batch ที่ส่งผ่าน `sp_executesql` เข้าสู่กระบวนการ compile แบบ serialize เหมือน stored procedure ช่วยลด **compilation storms** (โหลด compile พร้อมกันจำนวนมาก เช่น หลัง failover หรือ cache flush) — เปิดผ่าน database scoped configuration (`OPTIMIZED_SP_EXECUTESQL`)
 - ยังใช้เกณฑ์เดิม: ดู plan cache bloat ด้วย `sys.dm_os_memory_cache_counters` (CacheType `SQL Plans` vs `Object Plans`), SINGLE_USE vs MULTI_USE plans
-
-### 7.2 Query Store ล่าสุด
 - **Query Store สำหรับ readable secondary เปิด default ใน 2025** — วิเคราะห์ workload ฝั่ง AG secondary ได้เลย
 - **Query Store Hints (2022+)** + **`ABORT_QUERY_EXECUTION` hint (ใหม่ใน 2025)**: บล็อก query ที่รู้ว่ามีปัญหา (เช่น ad-hoc หนักจาก app) ได้โดยไม่ต้องแก้โค้ด
 - Automatic Plan Correction: `ALTER DATABASE ... SET AUTOMATIC_TUNING (FORCE_LAST_GOOD_PLAN = ON);`
-
-### 7.3 แนวทางปฏิบัติ
 - ตรวจ regressed plan ตาม `avg_duration`/`avg_cpu_time` ต่อช่วงเวลา (ทำใน Lab 8)
 - Force Plan ใช้เป็น **ยาฉุกเฉิน** พร้อมวางแผนแก้ query/index ที่ต้นเหตุต่อ
 

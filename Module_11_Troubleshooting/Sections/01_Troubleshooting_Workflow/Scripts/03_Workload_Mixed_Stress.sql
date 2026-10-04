@@ -1,3 +1,6 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+-- หมายเหตุ: บน SQL Server 2019/2022 ให้แก้ USE เป็น AdventureWorks2022 ก่อนรัน
+
 -- 03_Workload_Mixed_Stress.sql
 -- Generate mixed stress workload for all Troubleshooting Demo Scripts
 -- Run this first, then run other demo scripts to see various issues

@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 ﻿/*
     LAB: Module 06 - Advanced Index Analysis & Maintenance
     

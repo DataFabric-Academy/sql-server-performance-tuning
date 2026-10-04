@@ -25,6 +25,8 @@
 
 ### Step 1 — รัน chaos script ใน 4 หน้าต่างพร้อมกัน
 
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): บล็อกนี้ใช้ **transaction control** (`BEGIN TRAN`/`ROLLBACK` = เปิด/ยกเลิกกลุ่มคำสั่งที่ยังไม่บันทึกถาวร), `WAITFOR DELAY` (หน่วงเวลา batch), **WHILE** (วนลูป), **CROSS JOIN** + table constructor `(VALUES (...))` และ **window function** `ROW_NUMBER() OVER (...)` — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
+
 ```sql
 -- หน้าต่าง 1: Blocking (transaction ค้างถือ Lock อยู่)
 USE AdventureWorks2025;
@@ -68,11 +70,16 @@ ORDER BY pad DESC;
 
 ปิดหน้าต่าง chaos ทั้งหมดไม่ให้เห็น (หรือให้เพื่อนรัน) — แล้วเริ่มวินิจฉัยจากศูนย์
 
+**Expected:** ขณะ chaos ทำงาน (Step 1) ทั้ง 4 หน้าต่างยังไม่คืนผล — ตรวจด้วย query ใน Exercise 2 Step 1 จะเห็นหน้าต่าง 1 เป็น head blocker (`WAITFOR` + เปิด transaction ค้าง) ถือ X lock, หน้าต่าง 2 `status = running` กิน CPU, หน้าต่าง 3 ติด `ASYNC_NETWORK_IO` ขณะสตรีมผลใหญ่, หน้าต่าง 4 ขอ memory grant ใหญ่เพื่อ sort
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: หน้าต่าง 1 = `suspended/WAITFOR` + open transaction (ถือ X lock จน ROLLBACK ครบ 60 วินาที), หน้าต่าง 2 = `running` cpu_time สะสมถึง 46,708 ms, หน้าต่าง 3 = `suspended/ASYNC_NETWORK_IO`, หน้าต่าง 4 ได้ grant 700,960 KB แต่ใช้จริง 24,320 KB (overgrant ของ NVARCHAR(MAX)) — รันฉบับย่อ (CPU loop 200 ล้านรอบ, I/O ×8, WAITFOR 60–90 วินาที)
+
 ---
 
 ## Exercise 2: Top-down Diagnosis
 
 ### Step 1 — ชั้น Waits: ระบบกำลังรออะไร "ตอนนี้"
+
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): บล็อกนี้ใช้ **CROSS APPLY** (เรียก TVF `sys.dm_exec_sql_text` ต่อท้ายทีละแถวเพื่อดึงข้อความ SQL ของ request) และ **GROUP BY** กับ `COUNT`/`MAX` (รวมแถวต่อกลุ่มเพื่อนับ victim ต่อ head blocker) — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
 
 ```sql
 -- สดจาก requests ที่กำลังรัน (ไม่ใช่ค่าสะสม)
@@ -81,10 +88,13 @@ SELECT r.session_id, r.blocking_session_id,
        r.cpu_time, r.total_elapsed_time, r.logical_reads,
        r.status, LEFT(t.text, 60) AS running_sql
 FROM sys.dm_exec_requests AS r
+JOIN sys.dm_exec_sessions AS s ON s.session_id = r.session_id
 CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) AS t
-WHERE r.session_id <> @@SPID AND r.is_user_process = 1
+WHERE r.session_id <> @@SPID AND s.is_user_process = 1
 ORDER BY r.total_elapsed_time DESC;
 ```
+
+> ⚠️ `is_user_process` ถูกถอดออกจาก `sys.dm_exec_requests` ใน SQL Server 2025 — ต้อง JOIN `sys.dm_exec_sessions` (ตรวจจริงบน 17.0.1000.7: ใช้ `r.is_user_process` ตรง ๆ จะ error `Invalid column name`)
 
 ### Step 2 — ชั้น Resource: จัดกลุ่มอาการ
 
@@ -102,8 +112,6 @@ SELECT scheduler_id, runnable_tasks_count, current_tasks_count
 FROM sys.dm_os_schedulers
 WHERE scheduler_id < 1048576 AND runnable_tasks_count > 0;
 ```
-
-✅ **คาดหวังจาก chaos นี้**: มี head blocker หนึ่งตัว (หน้าต่าง 1) + LCK_M_X waits จากทุก query ที่แตะ `Production.ProductInventory` / `Sales.*` + `SOS_SCHEDULER_YIELD` จาก CPU loop + `WRITELOG` จาก updates
 
 ### Step 3 — ชั้น Query: ตัวร้ายคือ query อะไร
 
@@ -136,6 +144,9 @@ FROM sys.configurations
 WHERE name IN ('max degree of parallelism', 'cost threshold for parallelism',
                'max server memory (MB)', 'blocked process threshold (s)');
 ```
+
+**Expected:** เห็น head blocker 1 ตัว (หน้าต่าง 1) พร้อม query ที่แย่ง lock แถวเดียวกันรอด้วย `LCK_M_*`, CPU loop `running`/`SOS_SCHEDULER_YIELD`, หน้าต่าง I/O ติด `ASYNC_NETWORK_IO`; Step 3 เห็น chaos query ใน plan cache และ Query Store; Step 4 ได้ค่า config ที่เกี่ยวข้องกับอาการ
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: Step 2 พบ head blocker เดียว (`victims_waiting = 1`, `longest_wait_ms = 20,505`) และ scheduler query ให้ทั้งผลว่างเปล่า (CPU ยังว่าง) และ `runnable_tasks_count = 1` บน scheduler 2 เมื่อ CPU loop ยังรัน; หมายเหตุ: DB ทดสอบเปิด RCSI — SELECT ธรรมดาไม่ block มีเฉพาะ request ที่ขอ X lock (UPDATE/XLOCK); Step 3 พบ chaos query ใน cache (sort ใช้ CPU 2,355 ms) และ Query Store (I/O query avg_duration ~50 วินาที จากสตรีมผ่าน WAN); Step 4: cost threshold = 5, MAXDOP = 4, max server memory = 2147483647, blocked process threshold = 0
 
 ---
 
@@ -174,6 +185,9 @@ SELECT s.name, s.create_time, t.target_name
 FROM sys.dm_xe_sessions AS s
 JOIN sys.dm_xe_session_targets AS t ON s.address = t.event_session_address;
 ```
+
+**Expected:** หลัง `KILL` head blocker ลูกโซ่ blocking ปลดทันที — `still_blocked = 0` และ query ที่รอค้างกลับมารันจนเสร็จ; Step 4 ต้องเห็น XEvent session ของระบบกำลังทำงาน (อย่างน้อย `system_health`) และ session จาก Lab 9 ถ้ายัง start อยู่
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: KILL head blocker (open tran = 1) ปลด victim ที่รอ `LCK_M_X` มา ~20.7 วินาที 2 ตัวทันที (เสร็จภายใน 4 ms หลัง KILL), `still_blocked = 0`, ข้อมูลไม่เสียหาย (transaction ค้างถูก rollback อัตโนมัติ); เห็น `system_health`, `sp_server_diagnostics session`, `telemetry_xevents` กำลัง run
 
 ---
 

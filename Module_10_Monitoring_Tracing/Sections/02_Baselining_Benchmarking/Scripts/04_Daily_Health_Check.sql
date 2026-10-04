@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 /*
     LAB: Module 10 - Daily Health Check & Baseline
     
@@ -47,17 +49,16 @@ FROM (
 	,	record.value('(./Record/SchedulerMonitorEvent/SystemHealth/SystemIdle)[1]', 'int') AS [SystemIdle]
 	,	record.value('(./Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int') AS [SQLProcessUtilization]
 	,	[timestamp]
-	,	cpu_ticks / (cpu_ticks/ms_ticks) AS [ts_now]
+	,	osi.cpu_ticks / (osi.cpu_ticks / osi.ms_ticks) AS [ts_now]
 	FROM (
 		SELECT
 			[timestamp]
 		,	CONVERT(xml, record) AS [record]
-		,	cpu_ticks
-		,	ms_ticks
 		FROM sys.dm_os_ring_buffers
 		WHERE ring_buffer_type = N'RING_BUFFER_SCHEDULER_MONITOR'
 		AND record LIKE N'%<SystemHealth>%'
 	) AS x
+	CROSS JOIN sys.dm_os_sys_info AS osi
 ) AS y
 ORDER BY record_id DESC;
 

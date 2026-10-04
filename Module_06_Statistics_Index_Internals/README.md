@@ -35,7 +35,7 @@ Index เปรียบเสมือนเครื่องมือช่�
 ---
 
 
-## ### 7.1 Statistics & Cardinality Estimation
+### 7.1 Statistics & Cardinality Estimation
 - **CE Feedback for Expressions (ใหม่ใน 2025)**: engine เรียนรู้ค่า CE ที่เหมาะกับ expression (เช่น `DATEDIFF`, `CONVERT` บน predicate) จากการรันจริงข้าม query แล้วใช้ซ้ำ — ลดปัญหา CE ผิดเพี้ยนซ้ำ ๆ
 - **Persisted statistics for readable secondaries (2025)**: AG readable secondary สร้าง/เก็บ stats ของ workload ฝั่ง read ได้เอง ไม่ต้องรอ stats จาก primary — แก้ปัญหา plan แย่บน secondary
 - Auto update statistics async / auto drop statistics (`AUTO_DROP` — 2022) ยังเป็น default best practice

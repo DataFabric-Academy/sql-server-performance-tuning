@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- 04_Latch_Spinlock_Analysis.sql
 -- Source: Adapted from phakkhaphong/SQL-Server-Performance/Lock
 -- Purpose: Advanced troubleshooting for Latch (Memory protection) and Spinlock (Low-level structure) contention.

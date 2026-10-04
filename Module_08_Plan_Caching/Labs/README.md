@@ -23,12 +23,14 @@ Stored procedure ตัวหนึ่งเคยเร็วมากแต่
 
 ## Exercise 1: เปิด Query Store
 
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): `ALTER DATABASE … SET QUERY_STORE (…)` คือ DDL ระดับฐานข้อมูลที่เปิด/ตั้งค่า Query Store และ `sys.database_query_store_options` คือ catalog view สำหรับอ่านสถานะปัจจุบัน — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
+
 ```sql
 ALTER DATABASE AdventureWorks2025 SET QUERY_STORE = ON;
 ALTER DATABASE AdventureWorks2025 SET QUERY_STORE
 (
     OPERATION_MODE = READ_WRITE,
-    QUERY_CAPTURE_MODE = AUTO,          -- 2025: มี CUSTOM ให้ปรับละเอียดได้
+    QUERY_CAPTURE_MODE = ALL,           -- ⚠️ แล็บนี้ต้องใช้ ALL (ด้านล่าง) / CUSTOM ปรับ policy ละเอียดได้ (มีตั้งแต่ SQL Server 2019+)
     MAX_STORAGE_SIZE_MB = 1024,
     DATA_FLUSH_INTERVAL_SECONDS = 900,
     MAX_PLANS_PER_QUERY = 200
@@ -39,9 +41,17 @@ SELECT actual_state_desc, query_capture_mode_desc, max_storage_size_mb
 FROM sys.database_query_store_options;
 ```
 
+> ⚠️ **ทำไมต้อง `QUERY_CAPTURE_MODE = ALL`** (ตรวจรันจริงบน 17.0.1135.8): ต้นฉบับใช้ AUTO — แต่ capture policy เริ่มต้นของ AUTO เก็บเฉพาะ query ที่หนักพอ (default: ≥ 30 executions **และ** exec CPU รวม ≥ 100 ms ภายใน 24 ชม.) — query สาธิตของแล็บนี้เบาเกินเกณฑ์ รัน 10 ครั้งแล้ว**ไม่ถูกเก็บเข้า Query Store เลย** ทำให้ Exercise 3 หา query ไม่เจอ — ใน production ค่อยพิจารณา AUTO/CUSTOM เพื่อลด overhead
+
+**Expected:** `actual_state_desc = READ_WRITE`, `query_capture_mode_desc = ALL`, `max_storage_size_mb = 1024` ตรงกับที่ SET; ถ้า Query Store เปิดค้างจากก่อนหน้า คำสั่ง ALTER รันซ้ำได้เฉย ๆ (idempotent)
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: ได้ READ_WRITE / ALL / 1024 ตามคำสั่ง (VM ทดสอบเปิด Query Store ค้างไว้แล้วที่ ALL / 100 MB — ALTER ซ้ำผ่านเฉย ๆ)
+
 ---
 
 ## Exercise 2: จำลอง Regression
+
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): `CREATE INDEX` / `DROP INDEX` คือ DDL จัดการ index และ `sp_executesql` คือระบบ procedure ที่รัน SQL พร้อม**พารามิเตอร์** (`@CustomerID`) — แล็บนี้ตั้งใจใช้พารามิเตอร์เพื่อให้ Query Store มองทุกการรันเป็น query เดียวกัน — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
+> ⚠️ **ทำไมไม่ใช้ `EXEC ('SELECT … WHERE CustomerID = 11091;')` แบบ literal ตามต้นฉบับ** (ตรวจรันจริงบน 17.0.1135.8): query แบบ literal ถูก simple parameterization เป็น `(@1 smallint) … WHERE [CustomerID]=@1` เฉพาะชุดแรก — พอ `DROP INDEX` แล้วรันซ้ำ shell plan ที่รอดอยู่จะ compile แบบ ad-hoc ไม่แตกพารามิเตอร์ซ้ำ ทำให้ "ยุคแย่" ถูกเก็บเป็น **query_id อื่น** และ Exercise 3 จะไม่เห็น 2 plans ใน query เดียว — ใช้ `sp_executesql` จึงได้ผลตามที่แล็บออกแบบ
 
 ### Step 1 — สร้าง index ดีและรัน query ให้เกิดประวัติ "ยุคทอง"
 
@@ -53,7 +63,8 @@ ON Sales.SalesOrderHeader (CustomerID, OrderDate)
 INCLUDE (TotalDue, Status);
 
 -- รัน ~10 รอบ (เก็บประวัติ Good Plan)
-EXEC ('SELECT SalesOrderID, OrderDate, TotalDue FROM Sales.SalesOrderHeader WHERE CustomerID = 11091;');
+EXEC sp_executesql N'SELECT SalesOrderID, OrderDate, TotalDue FROM Sales.SalesOrderHeader WHERE CustomerID = @CustomerID;',
+     N'@CustomerID int', @CustomerID = 11091;
 GO 10
 ```
 
@@ -62,8 +73,9 @@ GO 10
 ```sql
 DROP INDEX IX_SalesOrderHeader_CustomerID_OrderDate ON Sales.SalesOrderHeader;
 GO
-EXEC ('SELECT SalesOrderID, OrderDate, TotalDue FROM Sales.SalesOrderHeader WHERE CustomerID = 11091;');
-GO 10   -- ประวัติ Bad Plan (Scan)
+EXEC sp_executesql N'SELECT SalesOrderID, OrderDate, TotalDue FROM Sales.SalesOrderHeader WHERE CustomerID = @CustomerID;',
+     N'@CustomerID int', @CustomerID = 11091;
+GO 10   -- ประวัติ Bad Plan (ช้าลง ~2-3 เท่า)
 ```
 
 ### Step 3 — สร้าง index กลับ (ทำให้ force plan ทำงานได้ในขั้นถัดไป)
@@ -74,9 +86,14 @@ ON Sales.SalesOrderHeader (CustomerID, OrderDate)
 INCLUDE (TotalDue, Status);
 ```
 
+**Expected:** ผลลัพธ์ query ได้ 28 แถวทุกรอบ (CustomerID = 11091 มี 28 รายการ); Query Store เก็บเป็น query_id เดียวที่มี 2 plans — plan ยุคทองเร็วกว่า plan ยุคแยกประมาณ 2-3 เท่า (หน่วย `avg_duration` คือ microseconds)
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: query_id 981 — plan 735 (ยุคทอง) 10 execs, avg_duration 63 µs; หลัง DROP INDEX เกิด plan 737 (ยุคแย่) 10 execs, avg_duration 165.4 µs (~2.6 เท่าของ plan ดี)
+
 ---
 
 ## Exercise 3: วิเคราะห์ Regressed Plan (GUI + T-SQL)
+
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): query ด้านล่าง JOIN กัน 5 catalog view ของ Query Store (query → query_text → plan → runtime_stats → runtime_stats_interval) ใช้ `CASE WHEN` ภายใน `MIN()`/`MAX()` เพื่อแยกสถิติยุคเก่า/ใหม่ และใช้ `DECLARE` + กำหนดค่าตัวแปรด้วย `SELECT TOP (1)` ใน Step 3 — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
 
 ### Step 1 — GUI: รายงาน Regressed Queries
 
@@ -85,6 +102,8 @@ INCLUDE (TotalDue, Status);
 3. คลิก plan ที่ดี → ปุ่ม **Force Plan** → สังเกตเครื่องหมายถูกที่ plan
 
 ### Step 2 — T-SQL: หา regressed plan ด้วยตัวเอง
+
+> ⚠️ ต้องกรองด้วย text แบบพารามิเตอร์ — Query Store เก็บ query นี้เป็น `(@CustomerID int)SELECT … WHERE CustomerID = @CustomerID` (ไม่มี literal 11091 ให้ค้น) และระวัง `LIKE '%...[]...%'` เพราะวงเล็บเหลี่ยมใน pattern ถูกตีความเป็น character class
 
 ```sql
 SELECT q.query_id,
@@ -99,7 +118,7 @@ JOIN sys.query_store_plan AS p ON q.query_id = p.query_id
 JOIN sys.query_store_runtime_stats AS rs ON p.plan_id = rs.plan_id
 JOIN sys.query_store_runtime_stats_interval AS rsi
     ON rs.runtime_stats_interval_id = rsi.runtime_stats_interval_id
-WHERE qt.query_sql_text LIKE '%SalesOrderHeader WHERE CustomerID = 11091%'
+WHERE qt.query_sql_text LIKE '%SELECT SalesOrderID, OrderDate, TotalDue FROM Sales.SalesOrderHeader WHERE CustomerID = @CustomerID%'
 GROUP BY q.query_id, qt.query_sql_text, p.plan_id, p.is_forced_plan
 ORDER BY q.query_id, p.plan_id;
 ```
@@ -123,16 +142,32 @@ SELECT plan_id, is_forced_plan, force_failure_count, last_force_failure_reason_d
 FROM sys.query_store_plan
 WHERE query_id = <query_id>;
 
--- รัน query เดิมซ้ำ แล้วดูใน sys.query_store_plan ว่า forced plan ถูกใช้จริง
+-- รัน query เดิมซ้ำ 2-3 ครั้ง แล้วยืนยันว่า executions ไปลง plan ที่ถูก force
+EXEC sp_executesql N'SELECT SalesOrderID, OrderDate, TotalDue FROM Sales.SalesOrderHeader WHERE CustomerID = @CustomerID;',
+     N'@CustomerID int', @CustomerID = 11091;
+GO 3
+SELECT p.plan_id, p.is_forced_plan, rs.count_executions
+FROM sys.query_store_plan AS p
+JOIN sys.query_store_runtime_stats AS rs ON p.plan_id = rs.plan_id
+WHERE p.query_id = <query_id>;
 ```
+
+**Expected:** Step 2 ได้ 2 แถว (2 plans ของ query_id เดียว) — plan เก่า avg_duration ต่ำกว่า ~2-3 เท่า; Step 3 force แล้ว `is_forced_plan = 1`, `force_failure_count = 0`, `last_force_failure_reason_desc = NONE` และหลังรันซ้ำ executions เพิ่มที่ plan ที่ถูก force เท่านั้น
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: plan 735 avg 63 µs vs plan 737 avg 165.4 µs; `avg_duration_old = NULL` ทั้งคู่เพราะทุก runtime interval เกิดภายในวันเดียว (รันแล็บจบใน ~1 ชม. — สถานการณ์จริงที่ยุคทองเก่ากว่า 1 วันจะมีค่า) และมี warning "Null value is eliminated by an aggregate" ติดมาให้เฉย ๆ; force แล้วรันซ้ำ 3 ครั้ง: count_executions ของ plan 735 ไปเพิ่มใน runtime interval ใหม่ (10 → 13) ส่วน plan 737 ค้างที่ 10
 
 ---
 
 ## Exercise 4: Query Store Hints + ABORT_QUERY_EXECUTION (SQL Server 2025)
 
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): `sp_query_store_set_hints` รับ hint เป็น Unicode string (`N'…'`) เขียน `OPTION()` แบบเดียวกับใน query; `JSON_VALUE(details, '$…')` คือฟังก์ชันอ่านค่าจาก JSON string ในคอลัมน์ `details` ของ DMV — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
+
 ### Step 1 — บังคับ hint ผ่าน Query Store (แก้ปัญหาโดยไม่แก้โค้ด)
 
+> ⚠️ **ต้องปลด forced plan ก่อน** (ตรวจรันจริงบน 17.0.1135.8): ถ้า query ยังมี forced plan จาก Exercise 3 ค้างอยู่ `sp_query_store_set_hints` จะ error **Msg 12457** "Query … has forced plan. No hints can be applied to it while it has forced plan." — เรียก `sp_query_store_unforce_plan` ก่อนตั้ง hints
+
 ```sql
+EXEC sp_query_store_unforce_plan @query_id = <query_id>, @plan_id = <plan_id ที่ force ไว้ใน Exercise 3>;
+GO
 EXEC sp_query_store_set_hints
     @query_id = <query_id>,
     @query_hints = N'OPTION (MAXDOP 1)';
@@ -144,7 +179,7 @@ SELECT * FROM sys.query_store_query_hints;
 ### Step 2 — บล็อก query มีปัญหาไม่ให้รัน (2025)
 
 ```sql
--- ABORT_QUERY_EXECUTION: query ที่ถูก hint จะได้ error 8799 ทันทีที่พยายามรัน
+-- ABORT_QUERY_EXECUTION: query ที่ถูก hint จะได้ error 8778 ทันทีที่พยายามรัน
 EXEC sp_query_store_set_hints
     @query_id = <query_id>,
     @query_hints = N'OPTION (USE HINT (''ABORT_QUERY_EXECUTION''))';
@@ -154,16 +189,21 @@ EXEC sp_query_store_set_hints
 
 ### Step 3 — Automatic Plan Correction (ให้ระบบแก้เอง)
 
+> ⚠️ **SQL Server 2025 ตัดคอลัมน์ `script` ออกจาก `sys.dm_db_tuning_recommendations`** (ตรวจรันจริงบน 17.0.1135.8 — query แบบเดิม error `Invalid column name 'script'`) และ JSON ในคอลัมน์ `details` ซ้อนอยู่ใต้ `$.planForceDetails.*` — ใช้ query ด้านล่างนี้แทน
+
 ```sql
 ALTER DATABASE AdventureWorks2025 SET AUTOMATIC_TUNING (FORCE_LAST_GOOD_PLAN = ON);
 GO
 -- ดูคำแนะนำที่ระบบให้
 SELECT reason, score,
-       script,
-       JSON_VALUE(details, '$.regressedPlanId') AS regressed_plan,
-       JSON_VALUE(details, '$.recommendedPlanId') AS recommended_plan
+       JSON_VALUE(details, '$.planForceDetails.queryId') AS query_id,
+       JSON_VALUE(details, '$.planForceDetails.regressedPlanId') AS regressed_plan,
+       JSON_VALUE(details, '$.planForceDetails.recommendedPlanId') AS recommended_plan
 FROM sys.dm_db_tuning_recommendations;
 ```
+
+**Expected:** Step 1 เห็นแถว `OPTION (MAXDOP 1)` ใน `sys.query_store_query_hints` (source_desc = User); Step 2 รัน query ที่ถูก ABORT แล้ว error **8778** ทันทีโดยไม่ทำงาน; Step 3 `FORCE_LAST_GOOD_PLAN` กลับเป็น ON และ DMV แสดง recommendation ที่ระบบวิเคราะห์แล้ว (อาจยังว่างช่วงแรกหลัง regression เพราะระบบใช้เวลาวิเคราะห์ — รอสักครู่แล้วรันซ้ำ)
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: รัน query ติด ABORT ได้ **Msg 8778** "Query execution has been aborted because the ABORT_QUERY_EXECUTION hint was specified."; DMV ให้ 2 recommendations จาก activity เดิมของ VM (score 56 → query 719, regressed_plan 698, recommended_plan 466 และ score 51 → query 724, regressed_plan 700, recommended_plan 471)
 
 ---
 
@@ -177,7 +217,8 @@ FROM sys.dm_db_tuning_recommendations;
 
 ```sql
 USE AdventureWorks2025;
-EXEC sp_query_store_remove_query @query_id = <query_id>;  -- ลบ hints/force ที่เกี่ยวข้อง
+EXEC sp_query_store_clear_hints @query_id = <query_id>;   -- เคลียร์ hints ก่อน — ถ้ามี hint ค้าง remove_query จะ error 12456
+EXEC sp_query_store_remove_query @query_id = <query_id>;  -- ลบ force/hint/สถิติที่เกี่ยวข้อง
 ALTER DATABASE AdventureWorks2025 SET AUTOMATIC_TUNING (FORCE_LAST_GOOD_PLAN = OFF);
 DROP INDEX IF EXISTS IX_SalesOrderHeader_CustomerID_OrderDate ON Sales.SalesOrderHeader;  -- ตามเดิมก่อนแล็บ
 ```

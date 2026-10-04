@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- 08_Wait_Stats_Analysis.sql
 -- Top Wait Types Analysis (Modern, SQL Server 2016–2025)
 -- Based on: SQL Server 2025 Diagnostic Information Queries (Glenn Berry)

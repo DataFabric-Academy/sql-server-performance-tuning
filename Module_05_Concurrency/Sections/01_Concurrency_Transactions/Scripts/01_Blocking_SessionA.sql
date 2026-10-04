@@ -1,3 +1,6 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+-- หมายเหตุ: บน SQL Server 2019/2022 ให้แก้ USE เป็น AdventureWorks2022 ก่อนรัน
+
 -- 01_Blocking_SessionA.sql
 -- Generate blocking scenario for Demo Scripts
 -- Run this in Session A, then run 01_Blocking_SessionB.sql in Session B

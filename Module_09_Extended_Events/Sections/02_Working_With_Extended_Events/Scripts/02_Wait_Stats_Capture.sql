@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- Lab: Capture Wait Stats with Extended Events
 -- วัตถุประสงค์: สร้าง XEvent Session เพื่อจับ Wait Info ที่นานเกิน 500ms
 

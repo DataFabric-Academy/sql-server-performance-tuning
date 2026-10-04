@@ -1,0 +1,55 @@
+=== confirm workload sessions gone ===
+active_user_requests
+--------------------
+3
+
+=== Ex3 Step4: Signal Wait Ratio AFTER workload ===
+signal_wait_pct resource_wait_pct total_waiting_tasks
+--------------- ----------------- -------------------
+3.8656616459950 96.1343383540050 911014
+
+=== Ex3 Step4b: SOS_SCHEDULER_YIELD accumulation after workload ===
+wait_type waiting_tasks_count total_wait_s pct_total resource_s signal_s
+--------- ------------------- ------------ --------- ---------- --------
+ASYNC_NETWORK_IO 93827 2598.045000 83.0 2542.529000 55.516000
+PREEMPTIVE_OS_CRYPTOPS 1629 404.299000 12.9 404.299000 0.000000
+PREEMPTIVE_OS_REPORTEVENT 429 38.916000 1.2 38.916000 0.000000
+PREEMPTIVE_OS_CLOSEHANDLE 419 25.505000 0.8 25.505000 0.000000
+PREEMPTIVE_OS_AUTHORIZATIONOPS 685 22.694000 0.7 22.694000 0.000000
+PREEMPTIVE_OS_CRYPTACQUIRECONTEXT 562 21.908000 0.7 21.908000 0.000000
+SOS_SCHEDULER_YIELD 17185 10.554000 0.3 0.075000 10.479000
+PREEMPTIVE_OS_QUERYREGISTRY 6402 1.831000 0.1 1.831000 0.000000
+WRITELOG 1112 1.110000 0.0 0.819000 0.291000
+PAGEIOLATCH_SH 735 0.805000 0.0 0.781000 0.024000
+
+=== Ex4 Step2: wait during large result set streaming (slow client simulation) ===
+=== Ex4 Step2: dm_exec_requests while large result streams ===
+session_id status wait_type wait_time blocking_session_id cpu_time
+---------- ------ --------- --------- ------------------- --------
+51 sleeping NULL 0 0 0
+52 sleeping NULL 0 0 0
+53 sleeping NULL 0 0 0
+54 sleeping NULL 0 0 0
+55 sleeping NULL 0 0 0
+56 sleeping NULL 0 0 0
+57 sleeping NULL 0 0 0
+58 sleeping NULL 0 0 0
+60 sleeping NULL 0 0 0
+61 sleeping NULL 0 0 0
+62 sleeping NULL 0 0 0
+63 sleeping NULL 0 0 0
+64 sleeping NULL 0 0 0
+65 sleeping NULL 0 0 0
+66 sleeping NULL 0 0 0
+67 sleeping NULL 0 0 0
+68 sleeping NULL 0 0 0
+69 suspended ASYNC_NETWORK_IO 0 0 206
+70 running NULL 0 0 3
+75 sleeping NULL 0 0 0
+78 sleeping NULL 0 0 0
+
+=== Ex4 Step2b: waiting_tasks view of the same session ===
+session_id wait_type wait_duration_ms
+---------- --------- ----------------
+69 ASYNC_NETWORK_IO 11
+

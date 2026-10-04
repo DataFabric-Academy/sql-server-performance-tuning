@@ -14,9 +14,6 @@
 
 ---
 
----
-
-
 ## 📚 Sections (สารบัญบทเรียน)
 
 | # | Section |
@@ -24,15 +21,15 @@
 | 1 | [Troubleshooting Workflow](Sections/01_Troubleshooting_Workflow/README.md) |
 | 2 | [Scenarios and Resolution](Sections/02_Scenarios_and_Resolution/README.md) |
 
----
+**ทบทวนรวม:** [Quiz Bank บทที่ 11](Quiz_Bank.md) — 15 คำถามพร้อมเฉลยครอบ Learning Objectives ของบท
 
+---
 
 ## 🧪 Labs
 
 คู่มือปฏิบัติแบบ Instruction + Code block: [Labs/README.md](Labs/README.md) — สคริปต์ประกอบอยู่ใน `Sections/*/Scripts/` ตามหัวข้อ
 
 ---
-
 
 ## <details>
 <summary><b>1. ขั้นตอนแรกของการ Troubleshooting คืออะไร?</b></summary>
@@ -49,11 +46,7 @@ Wait Statistics: เพื่อดูว่า SQL Server กำลังรอ
 การ Tuning ไม่ใช่งานที่ทำครั้งเดียวจบ เพราะข้อมูลเปลี่ยนตลอดเวลา Plan ที่เคยดีอาจจะแย่ลงได้ ต้องคอย Monitor เสมอ
 </details>
 
-
 ---
-
----
-
 
 ## > **"Performance Tuning is a journey, not a destination."**
 

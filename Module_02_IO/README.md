@@ -25,6 +25,7 @@
 | 2 | [Storage Solutions](Sections/02_Storage_Solutions/README.md) |
 | 3 | [IO Setup Best Practices](Sections/03_IO_Setup_Best_Practices/README.md) |
 | 4 | [Monitoring Troubleshooting IO](Sections/04_Monitoring_Troubleshooting_IO/README.md) |
+| 🔎 | [Quiz Bank — 15 ข้อพร้อมเฉลย](Quiz_Bank.md) |
 
 ---
 
@@ -56,7 +57,7 @@
 ---
 
 
-## ### 8.1 เครื่องมือทดสอบ I/O
+### 8.1 เครื่องมือทดสอบ I/O
 - **SQLIO ถูกยกเลิกแล้วทั้งหมด** — ใช้ **DiskSpd** (microsoft/diskspd) เป็นเครื่องมือมาตรฐานเดียว สอดคล้องกับ Lab ของ 10987C ที่แนบ DiskSpd 2.0.15 มาให้พร้อมใช้
 - ทางเลือกเสริมยุคใหม่: VM Fleet / storage benchmark ของ hardware vendor แต่หลักการตีความผล (IOPS vs Throughput vs Latency) เหมือนเดิม
 

@@ -1,0 +1,19 @@
+=== Ex1 Step1: sys.dm_os_sys_info ===
+logical_cpus physical_sockets cores_per_socket numa_node_count max_workers_count scheduler_count scheduler_total_count sqlserver_start_time
+------------ ---------------- ---------------- --------------- ----------------- --------------- --------------------- --------------------
+4 1 2 1 512 4 12 2026-10-01 04:57:47.473
+
+=== Ex1 Step2: sys.dm_os_nodes ===
+node_id node_state_desc online_scheduler_count active_worker_count avg_load_balance cpu_affinity_mask
+------- --------------- ---------------------- ------------------- ---------------- -----------------
+0 ONLINE 4 40 12 15
+64 ONLINE DAC 1 1 0 0
+
+=== Ex1 Step3: sys.dm_os_schedulers (visible) ===
+parent_node_id scheduler_id status is_online is_idle current_tasks_count runnable_tasks_count work_queue_count pending_disk_io_count load_factor
+-------------- ------------ ------ --------- ------- ------------------- -------------------- ---------------- --------------------- -----------
+0 0 VISIBLE ONLINE 1 0 10 0 0 0 13
+0 1 VISIBLE ONLINE 1 1 11 0 0 0 12
+0 2 VISIBLE ONLINE 1 0 12 0 0 0 13
+0 3 VISIBLE ONLINE 1 1 10 0 0 0 13
+

@@ -25,14 +25,18 @@
 
 ### Step 1 — หา page แรกของตาราง
 
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): บล็อกนี้ใช้ **DBCC PAGE / DBCC TRACEON** (คำสั่ง console ระดับ engine สำหรับดูเนื้อใน page — ใช้แบบ read-only เท่านั้น) และ DMF `sys.dm_db_database_page_allocations(...)` (function ระบบที่รายงาน page ทุกหน้าของตาราง ต้องส่ง `DB_ID()` / `OBJECT_ID()` เป็น argument) — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
+> ⚠️ **หมายเหตุจากการรันจริง**: แบบเดิมที่ดึงคอลัมน์ `allocated_page_page_id` จาก `sys.system_internals_allocation_units` จะ error `Invalid column name` บน SQL Server 2025 (คอลัมน์นี้ไม่มีใน view นั้น) — จึงใช้ `sys.dm_db_database_page_allocations` แทน
+
 ```sql
 USE AdventureWorks2025;
 GO
-SELECT allocated_page_page_id AS first_page, au.type_desc AS allocation_unit
-FROM sys.system_internals_allocation_units AS au
-JOIN sys.partitions AS p
-    ON au.container_id = p.partition_id
-WHERE p.object_id = OBJECT_ID('Person.Person');
+SELECT TOP (1) allocated_page_file_id  AS file_id,
+       allocated_page_page_id AS first_page,
+       page_type_desc
+FROM sys.dm_db_database_page_allocations(DB_ID(), OBJECT_ID('Person.Person'), 1, NULL, 'DETAILED')
+WHERE is_allocated = 1 AND page_type_desc = 'DATA_PAGE'
+ORDER BY allocated_page_file_id, allocated_page_page_id;
 ```
 
 ### Step 2 — Dump page ด้วย DBCC PAGE (ตัวเลขจาก Step 1)
@@ -40,7 +44,7 @@ WHERE p.object_id = OBJECT_ID('Person.Person');
 ```sql
 DBCC TRACEON(3604);   -- ส่งผลลัพธ์ DBCC ออกทาง client
 GO
-DBCC PAGE('AdventureWorks2025', 1, <first_page จาก Step 1>, 3);  -- 3 = แสดง header + row detail
+DBCC PAGE('AdventureWorks2025', <file_id จาก Step 1>, <first_page จาก Step 1>, 3);  -- 3 = แสดง header + row detail
 GO
 ```
 
@@ -55,11 +59,16 @@ JOIN sys.partitions AS p ON au.container_id = p.partition_id
 WHERE p.object_id = OBJECT_ID('Person.Person');
 ```
 
+**Expected:** Step 1 ได้ 1 แถวเป็นเลข `file_id` + `first_page` ของ DATA_PAGE แรก; Step 2 Page Header แสดง `m_type = 1` (Data page), `m_level = 0`, `Metadata: ObjectId` ตรงกับ Person.Person และ `m_freeCnt` = ไบต์ว่างคงเหลือใน page; Step 3 ได้ used_pages/total_pages ต่อ allocation unit (แถว IN_ROW_DATA แรก = clustered index ของตาราง ต่อด้วยแถวของ NC indexes)
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: first DATA_PAGE = 1:736 · Header `m_type = 1`, `m_slotCnt = 5`, `m_freeCnt = 1162`, `Metadata: ObjectId = 898102240`, โยง page เพื่อนบ้าน (1:1279) ↔ (1:737) · IN_ROW_DATA used_pages = 3,831 / total_pages = 3,893 (ตามด้วย NC indexes 110/141 และ 67/81)
+
 ---
 
 ## Exercise 2: Random GUID vs Sequential Key (ผลต่อ pages + log)
 
 ### Step 1 — สร้างตารางคู่เปรียบเทียบ
+
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): Exercise นี้ใช้ **DDL** (`CREATE TABLE` / `CREATE CLUSTERED INDEX`), ทริค `GO 5` (สั่ง client รัน batch นี้ซ้ำ 5 ครั้ง — ไม่ใช่ T-SQL) และใน Step 4 ใช้ **Extended Events session** + `CROSS APPLY ... .nodes()` (แตก XML เป็นแถว) — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
 
 ```sql
 USE AdventureWorks2025;
@@ -107,7 +116,7 @@ FROM sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, 'DETAILED')
 WHERE object_id IN (OBJECT_ID('dbo.BadKeyTable'), OBJECT_ID('dbo.GoodKeyTable'));
 ```
 
-✅ **ผลที่คาดหวัง**: `BadKeyTable` fragmentation สูงเกือบ 99%, `avg_page_space_used_in_percent` ต่ำ, page_count บวม — เพราะ GUID สุ่มตำแหน่ง insert ทำให้เกิด page split ตลอดเวลา / `GoodKeyTable` fragment < 1%
+✅ **สังเกต**: เทียบทั้ง 3 ค่า (`avg_fragmentation_in_percent` / `page_count` / `avg_page_space_used_in_percent`) ระหว่างสองตาราง — ผลที่ควรเห็นและเหตุผลสรุปอยู่ที่ **Expected:** ท้าย Exercise นี้
 
 ### Step 4 — จับ page split แบบ real-time ด้วย Extended Events (เชื่อมกับบทที่ 9)
 
@@ -144,11 +153,16 @@ ALTER EVENT SESSION [XE_PageSplits] ON SERVER STATE = STOP;
 DROP EVENT SESSION [XE_PageSplits] ON SERVER;
 ```
 
+**Expected:** Step 3 แสดง `BadKeyTable` fragmentation สูงเกือบ 99%, `avg_page_space_used_in_percent` ต่ำ, page_count บวมกว่า `GoodKeyTable` ชัดเจน — เพราะ GUID สุ่มตำแหน่ง insert ทำให้เกิด page split ตลอดเวลา / `GoodKeyTable` fragment < 1–2% · Step 4 ระหว่าง XE session เปิดอยู่ การ INSERT ลง BadKeyTable จะถูกจับเป็น event `page_split` ทยอยเข้า ring buffer (ดึงด้วย query ด้านบน) — หมายเหตุ: `GO 5` (รวม 5 แถว) ยังเล็กเกินกว่าจะเกิด split ให้เห็น ทั้งสองตารางยังอยู่ 1 page ให้สาธิตรูปแบบเต็มด้วยลูปหลายพันแถวตามสคริปต์ `Sections/01_Structure_Internals/Scripts/01_Bad_vs_Good_Structure.sql`
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: ตามไฟล์ `GO 5` จริงได้ทั้งสองตาราง 1 page, frag 0% (เล็กเกิน) · insert ทีละแถว 3,000 แถว → BadKeyTable frag **98.5%** (132 pages, 132 fragments, space_used 67.1%) เทียบ GoodKeyTable frag **1.2%** (86 pages, 12 fragments, space_used 97.8%) · (ส่วน XE `page_split` ใน Step 4 ไม่ได้รันระหว่างการตรวจนี้เพราะ VM ทดสอบใช้ XE session ร่วมกัน — ผู้เรียนจะเห็นเองเมื่อรัน Step 4)
+
 ---
 
 ## Exercise 3: VLF — Transaction Log Internals
 
 ### Step 1 — ดู VLF ด้วย DMV ปัจจุบัน (SQL Server 2016 SP2+)
+
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): `sys.dm_db_log_info(NULL)` เป็น **TVF ระดับ instance** (ส่ง `NULL` = ดึงทุก database) และ Step 2-3 ใช้ **DDL** `ALTER DATABASE ... MODIFY FILE` (เปลี่ยนค่าไฟล์ log — ทำได้เฉพาะเครื่องทดสอบของผู้เรียนเอง ห้ามบน production) — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
 
 ```sql
 SELECT DB_NAME(lg.database_id) AS database_name,
@@ -186,6 +200,9 @@ MODIFY FILE (NAME = AdventureWorks2025_log, FILEGROWTH = 256 MB);
 GO
 ```
 
+**Expected:** Step 1 เห็นแถวต่อ VLF เรียงตาม sequence — log ที่ตั้งค่าดีมี VLF ไม่กี่สิบก้อน ขนาดค่อนข้างเท่ากัน; หลัง grow ทีละ 1 MB หลายครั้ง (Step 2) จำนวน VLF เพิ่มขึ้นเป็นก้อนเล็กจำนวนมาก; Step 3 แก้ FILEGROWTH เป็น 256 MB แล้ว growth ครั้งถัดไปจะสร้าง VLF ใหญ่น้อยก้อน (VLF เดิมไม่หาย — รีเซ็ตจริงต้อง SHRINKFILE + grow ใหม่ตามหมายเหตุด้านล่าง)
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: AdventureWorks_log = **6 VLFs** รวม ~136 MB (active 1) — เห็น VLF ขนาดปนกัน 64 MB กับ ~1.9–2.2 MB ซึ่งเป็นร่องรอย autogrowth ขนาดเล็กจากอดีต · tempdb = 4 VLFs, master = 8 VLFs · (Step 2-3 เป็น ALTER DATABASE จึงไม่ได้รันบน VM ใช้ร่วม — ให้ผู้เรียนทำบนเครื่องทดสอบของตนเอง)
+
 > **หมายเหตุ**: การลด VLF จริงจังทำผ่าน `DBCC SHRINKFILE(log, ...)` + grow ครั้งเดียวใหญ่ ๆ — อย่าทำบน production ระหว่างชั่วโมงทำงาน
 
 ---
@@ -193,6 +210,8 @@ GO
 ## Exercise 4: TempDB — ตรวจค่า + จำลอง Contention + แก้
 
 ### Step 1 — ตรวจการตั้งค่า tempdb ปัจจุบัน
+
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): Step 2 ใช้ **temp table** (`#t` = ตารางชั่วคราวเฉพาะ session ที่อยู่ใน tempdb สร้าง/ลบด้วย CREATE/DROP TABLE) + **WHILE** loop (T-SQL แบบวนลูป ไม่ใช่ set-based) และ Step 4 ใช้ **DDL** `ALTER DATABASE tempdb ADD FILE` — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
 
 ```sql
 SELECT name, size * 8 / 1024 AS size_mb,
@@ -258,6 +277,9 @@ SELECT servicename, service_account
 FROM sys.dm_server_services
 WHERE servicename LIKE 'SQL Server (%)';
 ```
+
+**Expected:** Step 1 เห็น tempdb data files หลายไฟล์ขนาดเท่ากัน growth เป็น MB (`is_percent_growth = 0`) · Step 2-3 ระหว่าง loop ให้ poll `sys.dm_exec_requests` — contention จริงจะเห็น `PAGELATCH_EX` บน `wait_resource` ขึ้นต้น `2:` (dbid 2 = tempdb) ซึ่งต้องรัน 4-8 หน้าต่างพร้อมกันตามที่ระบุ (1 หน้าต่างเดียวไม่เกิด contention ให้เห็น) และค่าใน `sys.dm_os_wait_stats` เป็นยอดสะสมทั้ง instance ให้ดูเฉลี่ยต่อครั้ง (`wait_time_ms ÷ waiting_tasks_count`) ไม่ใช่ยอดรวม · Step 5 service account ปกติ = `NT Service\MSSQLSERVER`
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: tempdb ตั้งมาถูกต้องแล้ว = 4 data files × 72 MB, growth 64 MB, `is_percent_growth = 0` (log 8 MB growth 64 MB) · loop 20,000 รอบ (1 หน้าต่าง) จบใน < 1 นาที และ polling 45 วินาทีไม่เจอ PAGE%LATCH บน `2:%` เลย (single session ไม่พอ — PAGELATCH_EX สะสมทั้ง instance 40,456 ครั้ง/590 ms ≈ 0.01 ms ต่อครั้ง = ระดับ background ปกติ) · service account = `NT Service\MSSQLSERVER` · (Step 4 ADD FILE ไม่ได้รันบน VM ใช้ร่วม)
 
 ---
 

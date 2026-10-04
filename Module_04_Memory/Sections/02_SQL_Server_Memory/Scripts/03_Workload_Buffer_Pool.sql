@@ -1,3 +1,6 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+-- หมายเหตุ: บน SQL Server 2019/2022 ให้แก้ USE เป็น AdventureWorks2022 ก่อนรัน
+
 -- 03_Workload_Buffer_Pool.sql
 -- Generate workload to populate Buffer Pool for Demo Scripts
 -- Run this in a separate session, then run 01_Buffer_Usage_By_DB.sql and 02_Page_Life_Expectancy.sql

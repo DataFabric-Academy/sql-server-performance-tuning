@@ -35,6 +35,7 @@
 
 | Module | หัวข้อ | คำอธิบาย | ระดับ |
 |:------:|:------|:---------|:-----:|
+| **[00](./Module_00_Getting_Started/README.md)** | เริ่มจากศูนย์ (Getting Started) | ศัพท์แกน DMV/Wait/Scheduler/Plan + Query แรก สำหรับผู้เรียนฐาน admin+query | ⭐ |
 | **[01](./Module_01_Architecture_Scheduling_Waits/README.md)** | Architecture, Scheduling, and Waits | เข้าใจการทำงานของ SQLOS, Schedulers และ Wait Stats | ⭐⭐⭐ |
 | **[02](./Module_02_IO/README.md)** | I/O Subsystem | การวัดผลและการจัดการ I/O Latency | ⭐⭐⭐ |
 | **[03](./Module_03_Database_Structures/README.md)** | Database Structures | Data Files, Log Files, VLFs และ TempDB | ⭐⭐ |

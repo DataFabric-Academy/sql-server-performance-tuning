@@ -18,7 +18,7 @@
 1. เข้าใจองค์ประกอบ session: Event / Action / Predicate / Target
 2. สร้าง session จับ slow & expensive queries
 3. จับ deadlock และดู Deadlock Graph
-4. (2025) ใช้ Time-bound session (`AUTO_STOP`)
+4. จำกัดอายุ session: ปิดตามเวลาด้วย SQL Agent job หรือ manual `STOP` (XEvents ไม่มี `AUTO_STOP` ในตัว — ตรวจแล้วบน 17.0.1000.7 syntax ไม่ผ่าน)
 
 ---
 
@@ -58,14 +58,16 @@ ORDER BY CarrierTrackingNumber, ModifiedDate;
 
 ### Step 3 — อ่านข้อมูลจาก ring_buffer
 
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): `CAST(target_data AS XML)` แปลงบัฟเฟอร์ของ target เป็น XML, `CROSS APPLY ... .nodes('//event')` ฉีกออกเป็นหลายแถว (แถวละ 1 event) แล้ว `.value()` ดึงค่าแต่ละ field ด้วย XQuery — path ต้องเขียน**สัมพัทธ์กับตัว `<event>`** เช่น `(@timestamp)`, `(data[@name="duration"]/value)` (ห้ามพิมพ์ `event/` นำหน้าซ้ำ เพราะ context node คือ `<event>` อยู่แล้ว — ใส่จะได้ NULL ทุกคอลัมน์ ตรวจจริงบน 17.x) — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
+
 ```sql
 SELECT
-    x.value('(event/@timestamp)[1]', 'DATETIME2')                      AS event_time,
-    x.value('(event/data[@name="duration"]/value)[1]', 'INT')/1000.0   AS duration_ms,
-    x.value('(event/data[@name="cpu_time"]/value)[1]', 'INT')/1000.0   AS cpu_ms,
-    x.value('(event/data[@name="logical_reads"]/value)[1]', 'BIGINT')  AS logical_reads,
-    x.value('(event/action[@name="sql_text"]/value)[1]', 'NVARCHAR(MAX)') AS sql_text,
-    x.value('(event/action[@name="client_app_name"]/value)[1]', 'SYSNAME') AS app_name
+    x.value('(@timestamp)[1]', 'DATETIME2')                            AS event_time,
+    x.value('(data[@name="duration"]/value)[1]', 'BIGINT')/1000.0      AS duration_ms,
+    x.value('(data[@name="cpu_time"]/value)[1]', 'BIGINT')/1000.0      AS cpu_ms,
+    x.value('(data[@name="logical_reads"]/value)[1]', 'BIGINT')        AS logical_reads,
+    x.value('(action[@name="sql_text"]/value)[1]', 'NVARCHAR(MAX)')    AS sql_text,
+    x.value('(action[@name="client_app_name"]/value)[1]', 'SYSNAME')   AS app_name
 FROM (
     SELECT CAST(target_data AS XML) AS buf
     FROM sys.dm_xe_session_targets AS t
@@ -77,6 +79,9 @@ ORDER BY event_time DESC;
 ```
 
 ✅ **สังเกต**: duration/cpu/logical_reads ของ query ที่เพิ่งรัน — นี่คือ "Profiler แบบเบา"
+
+**Expected:** ได้แถวเฉพาะ slow query ที่ผ่าน predicate (query สั้นกว่า 500 ms ไม่ปรากฏ); `duration_ms` ≥ 500, `sql_text` ตรงกับที่รัน, `app_name` เป็นชื่อเครื่องมือ client — และต้องรอ ≥ 5 วินาที (`MAX_DISPATCH_LATENCY`) ก่อนอ่าน buffer
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: จับได้ 1 event — `duration_ms = 2490.4` (CPU จริงแค่ 548 ms เพราะ duration รวมเวลาสตรีม 100,000 แถวออก client), `logical_reads = 1307`, `app_name = sqlcmd`; `SELECT TOP (5)` ถูก predicate กรองหาย
 
 ---
 
@@ -117,10 +122,12 @@ COMMIT;
 
 ### Step 3 — ดึง Deadlock Graph จาก session
 
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): โครงเดียวกับ Exercise 1 Step 3 (`CAST AS XML` + `nodes()` + `CROSS APPLY`) แต่ใช้ `.query()` ซึ่งคืน**ชิ้น XML ทั้งก้อน** (ต่างจาก `.value()` ที่คืนค่า scalar) เพื่อดึง deadlock graph จาก field `xml_report` — path ก็สัมพัทธ์กับ `<event>` เหมือนกัน — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
+
 ```sql
 SELECT
-    x.value('(event/@timestamp)[1]', 'DATETIME2') AS deadlock_at,
-    x.query('(event/data[@name="xml_report"]/value)[1]') AS deadlock_xml
+    x.value('(@timestamp)[1]', 'DATETIME2') AS deadlock_at,
+    x.query('(data[@name="xml_report"]/value/deadlock)[1]') AS deadlock_xml
 FROM (
     SELECT CAST(target_data AS XML) AS buf
     FROM sys.dm_xe_session_targets AS t
@@ -138,6 +145,9 @@ ORDER BY deadlock_at DESC;
 1. Object Explorer → Extended Events → Sessions → คลิกขวา `XE_DeadlockMonitor` → **Watch Live Data**
 2. ทำ deadlock ซ้ำ — event เด้งขึ้นจอแบบ real-time
 
+**Expected:** หนึ่งหน้าต่างได้ `Msg 1205 ... has been chosen as the deadlock victim` (อีกหน้าต่าง `COMMIT` ผ่าน); Step 3 ได้แถว `deadlock_xml` ที่คลิกเปิดได้ มี `<victim-list>` ระบุ victim + `<process-list>` 2 process + `<resource-list>`; ใน Watch Live Data เห็น event `xml_deadlock_report` เด้งสดทันทีที่ deadlock เกิด
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: หน้าต่าง A (spid 58, sqlcmd) เป็น victim ได้ Msg 1205, graph จาก ring_buffer หลังรอ ~7 วิ มี `<victim-list>` → `victimProcess` และ `<process-list>` 2 process (`logused 5740`, `waitresource KEY`)
+
 ---
 
 ## Exercise 3: จับ Long-Running Queries แบบ Production-grade (event_file)
@@ -149,14 +159,14 @@ CREATE EVENT SESSION [XE_LongRunning] ON SERVER
 ADD EVENT sqlserver.rpc_completed
 (
     ACTION ( sqlserver.sql_text, sqlserver.client_hostname, sqlserver.username )
-    WHERE ( duration > 3000000            -- > 3 วินาที
-            AND sqlserver.database_id = DB_ID('AdventureWorks2025') )
+    WHERE ( duration > 3000000                     -- > 3 วินาที
+            AND sqlserver.database_name = N'AdventureWorks2025' )
 ),
 ADD EVENT sqlserver.sql_batch_completed
 (
     ACTION ( sqlserver.sql_text, sqlserver.client_hostname )
     WHERE ( duration > 3000000
-            AND sqlserver.database_id = DB_ID('AdventureWorks2025') )
+            AND sqlserver.database_name = N'AdventureWorks2025' )
 )
 ADD TARGET package0.event_file
 (
@@ -171,7 +181,11 @@ GO
 ALTER EVENT SESSION [XE_LongRunning] ON SERVER STATE = START;
 ```
 
+> ⚠️ predicate ของ event session **ใส่ฟังก์ชันอย่าง `DB_ID()` ตรง ๆ ไม่ได้** (ได้ `Incorrect syntax near 'DB_ID'` — ตรวจจริงบน 17.0.1135.8) ให้ใช้ `sqlserver.database_name = N'...'` หรือใส่ค่า `database_id` ตัวเลขตรง ๆ แทน (หาค่าด้วย `SELECT DB_ID('AdventureWorks2025');`)
+
 ### Step 2 — อ่านไฟล์ .xel ด้วย T-SQL
+
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): `sys.fn_xe_file_target_read_file(...)` คือ TVF อ่านไฟล์ .xel ทีละแถว แล้ว `CROSS APPLY ( SELECT CAST(f.event_data AS XML) )` แปลงแต่ละแถวเป็น XML — ที่นี่ root ของ XML คือ `<event>` เอง จึงต้องเขียน path แบบ `event/data/...` (ต่างจาก Exercise 1–2 ที่ bind ที่ตัว `<event>` ผ่าน `nodes()` แล้ว จึงห้ามนำหน้าด้วย `event/`) — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
 
 ```sql
 SELECT
@@ -185,10 +199,14 @@ CROSS APPLY ( SELECT CAST(f.event_data AS XML) ) AS c(x)
 ORDER BY event_time DESC;
 ```
 
-### Step 3 (SQL Server 2025) — Time-bound session กันลืมปิด
+**Expected:** ได้แถวต่อ event ที่ผ่านเงื่อนไข (duration > 3 วิ และอยู่ใน DB ที่ระบุ) จากทุกไฟล์ .xel ที่ rollover ไว้; `event_name` เป็น `sql_batch_completed` (batch จาก sqlcmd/SSMS) หรือ `rpc_completed` (เรียก proc แบบมี parameter จาก application); คอลัมน์ `[user]` มีค่าเฉพาะแถว `rpc_completed` เพราะ action `username` ถูกขอไว้เฉพาะ event นั้น
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: batch `WAITFOR DELAY '00:00:04'; SELECT COUNT(*)...` ถูกจับเป็น `sql_batch_completed` `duration_s = 4.018` (predicate `database_name` ทำงานถูกต้อง), `[user] = NULL` ตามดีไซน์ และไฟล์เดียวกันยังเก็บ event ย้อนหลังจากการรันก่อนหน้า (rollover ยังไม่ถึง)
+
+### Step 3 — จำกัดอายุ session กันลืมปิด (ทุกรุ่น 2008+)
+
+> ⚠️ **ห้ามสอน `WITH (AUTO_STOP = ON)`** — option นี้ไม่มีอยู่จริงใน SQL Server 2025 (ตรวจจริงบน 17.0.1000.7 แล้วได้ `Incorrect syntax near 'AUTO_STOP'`) วิธีจริงคือกำหนดขนาด target แล้วปิดตามเวลาด้วย SQL Agent job หรือคำสั่ง `STATE = STOP`
 
 ```sql
--- 2025: session หยุดเองหลังเวลาที่กำหนด — กันลืมเปิดค้างบน production
 ALTER EVENT SESSION [XE_SlowQueries] ON SERVER STATE = STOP;
 DROP EVENT SESSION [XE_SlowQueries] ON SERVER;
 
@@ -198,10 +216,15 @@ ADD EVENT sqlserver.sql_batch_completed
     WHERE duration > 500000
 )
 ADD TARGET package0.ring_buffer ( SET max_memory = 2048 )
-WITH ( AUTO_STOP = ON );   -- ฟีเจอร์ใหม่ 2025: หยุดอัตโนมัติตามเวลา/เงื่อนไข
+WITH ( MAX_DISPATCH_LATENCY = 5 SECONDS );   -- กระจายข้อมูลทุก 5 วิ ลดความเสี่ยงสูญข้อมูล
 GO
 ALTER EVENT SESSION [XE_TimedCapture] ON SERVER STATE = START;
+-- ปิดตามเวลา: ตั้ง SQL Agent job ที่รัน "ALTER EVENT SESSION [XE_TimedCapture] ON SERVER STATE = STOP"
+-- หรือสั่ง STOP เองเมื่อจบการจับ — ทางเลือกสำหรับรุ่นเก่า: รูปแบบนี้รันได้ตั้งแต่ SQL Server 2008+
 ```
+
+**Expected:** สร้าง/START session สำเร็จ; หลัง START เห็นแถว `XE_TimedCapture` ใน `sys.dm_xe_sessions` (DMV นี้แสดงเฉพาะ session ที่กำลังรัน — ไม่มีคอลัมน์ status) และแถวหายไปทันทีหลัง `STOP`
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: START แล้วเห็น 1 แถวใน DMV, STOP แล้ว `COUNT(*) = 0`, DROP ผ่านครบ (ไม่มี AUTO_STOP)
 
 ---
 
@@ -225,5 +248,5 @@ DROP EVENT SESSION [XE_TimedCapture] ON SERVER;
 ## แหล่งอ้างอิง
 
 - 10987C Lab09 — `Trainer_Docs/10987/Labfiles/Lab09/`
-- Microsoft Learn: [Extended Events](https://learn.microsoft.com/sql/relational-databases/extended-events/extended-events) · [Time-bound sessions (2025)](https://learn.microsoft.com/sql/relational-databases/extended-events/sql-server-extended-events-sessions) · [Use SSMS XEvent profiler](https://learn.microsoft.com/sql/relational-databases/extended-events/use-the-ssms-xe-profiler)
+- Microsoft Learn: [Extended Events](https://learn.microsoft.com/sql/relational-databases/extended-events/extended-events) · [Extended Events sessions](https://learn.microsoft.com/sql/relational-databases/extended-events/sql-server-extended-events-sessions) · [Use SSMS XEvent profiler](https://learn.microsoft.com/sql/relational-databases/extended-events/use-the-ssms-xe-profiler)
 - สคริปต์ของแล็บนี้อยู่ใน `Sections/*/Scripts/` ของโมดูล จัดตามหัวข้อที่เกี่ยวข้อง (ลิงก์ในแต่ละ Exercise)

@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 /*
     Lab: Monitoring and Fixing Performance Regressions with Query Store
     Based on MS Learn: Monitoring Performance By Using the Query Store

@@ -139,7 +139,7 @@
 
 ## 5. การเตรียมสภาพแวดล้อม (Environment Setup)
 
-1. **SQL Server 2025 (17.x)** Developer Edition (ใช้ 2019/2022 ได้ — ข้อใดที่เป็นฟีเจอร์ใหม่จะมีหมายเหตุกำกับเสมอ) + **SSMS 21**
+1. **SQL Server 2025 (17.x)** Developer Edition — **17.x คือรุ่นต่ำสุดของคอร์ส** (แล็บบทที่ 5 และ 9 พิสูจน์ฟีเจอร์เฉพาะ 2025 จริง; Exercise ที่มี guard จะหยุดพร้อมข้อความแนะ "ทางเลือกสำหรับรุ่นเก่า" ให้ผู้เรียนที่ใช้ 2019/2022 ทำต่อได้) + **SSMS 21**
 2. Restore **AdventureWorks2025** (ตัวเลือกหลักสำหรับ SQL Server 2025 — ไฟล์ .bak ที่ build บนรุ่นใหม่ restore บนรุ่นเก่าไม่ได้ หากใช้ 2019/2022 ให้ใช้ AdventureWorks2022):
    [AdventureWorks2025.bak](https://github.com/Microsoft/sql-server-samples/releases/download/adventureworks/AdventureWorks2025.bak) · [วิธี restore จาก Microsoft Learn](https://learn.microsoft.com/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms)
    ```sql
@@ -154,7 +154,7 @@
    - **DiskSpd** — <https://github.com/microsoft/diskspd> (มี bundled ใน `Trainer_Docs/10987/Labfiles/Lab02/Diskspd-v2.0.15/`)
    - **ostress** (RML Utilities) สำหรับ replay workload
 4. Permission สำหรับผู้เรียน: `VIEW SERVER STATE`, `VIEW DATABASE STATE` (หรือบทบาท `##MS_ServerPerformanceStateReader##` ที่มาใหม่ใน SQL Server 2022+)
-5. ทดสอบความพร้อม: รัน Query แรกในแต่ละ Lab (มีคำสั่ง verify ต้นไฟล์ทุก Lab)
+5. ทดสอบความพร้อม: รัน Query แรกในแต่ละ Lab แล้วเทียบบล็อก **Expected:** ท้ายแต่ละ Exercise — ทุก Exercise มีเกณฑ์ผ่านจากการรันจริงบน SQL Server 2025 (17.x) พร้อมระบุ build/วันที่ที่ sign-off
 
 ## 6. Slide Decks & Template (ประกอบการสอน)
 
