@@ -39,7 +39,7 @@
 
 ## <details>
 <summary><b>1. ถ้าพบว่า Wait Type สูงสุดคือ CXPACKET และ CXCONSUMER คู่กัน แปลว่าอะไร?</b></summary>
-ส่วนใหญ่เป็นเรื่องปกติของ Parallel Execution แต่ถ้า CXPACKET สูงโดดๆ อาจต้องจูน Cost Threshold for Parallelism หรือ MAXDOP
+ส่วนใหญ่เป็นเรื่องปกติของ Parallel Execution แต่ถ้า CXPACKET สูงโดดๆ อาจต้องจูน Cost Threshold for Parallelism หรือ MAXDOP — อ่านละเอียดพร้อมตัวอย่างโค้ดบน AdventureWorks2025: [Section 1.4 หัวข้อ 4 — Parallel Execution](Sections/04_Wait_Statistics/README.md)
 </details>
 
 <details>
