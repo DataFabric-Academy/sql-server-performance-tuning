@@ -148,13 +148,13 @@ Missing Index DMV/hint เป็น **จุดเริ่ม ไม่ใช�
 <details>
 <summary><b>เฉลย Q8</b> — B</summary>
 
-"จ่ายแรมรับความว่างเปล่า" = ทุก INSERT/UPDATE/DELETE ต้อง maintain index นี้ (writes) แต่ไม่มีใครอ่าน (reads = 0) — เป็นผู้สมัคร DROP ตัวจริง แต่ก่อนกดปุ่ม: ต้องไม่ใช่ PK/Unique constraint (แล็บเจอ PK ที่ยัง reads 0 เพราะ DB ใหม่!) และต้องมี baseline **ยาว ≥ 1 business cycle** กันพลาดงานรายเดือน/รายปี — อ่านต่อ: [Labs Ex2 Step 1 + ✅ Expected](Labs/README.md)
+"จ่ายแรมรับความว่างเปล่า" = ทุก INSERT/UPDATE/DELETE ต้อง maintain index นี้ (writes) แต่ไม่มีใครอ่าน (reads = 0) — เป็นผู้สมัคร DROP ตัวจริง แต่ก่อนกดปุ่ม: ต้องไม่ใช่ PK/Unique constraint (แล็บเจอ PK ที่ยัง reads 0 เพราะ DB ใหม่!) และต้องมี baseline **ยาว ≥ 1 business cycle** กันพลาดงานรายเดือน/รายปี — อ่านต่อ: [Labs Ex2 Step 2 + ✅ Expected](Labs/README.md)
 </details>
 
 <details>
 <summary><b>เฉลย Q9</b> — B</summary>
 
-เกณฑ์มาตรฐาน: **REBUILD** เมื่อ > 30% (ทั้งหน้าใหม่หมด, แออัดกลับ 100%), **REORGANIZE** เมื่อ 5–30% (กวาดเฉพาะใน page, online เสมอ), **< 5% ปล่อย** — พร้อมเงื่อนไข `page_count > 1000` กันตัดสินจากตารางเล็กที่ "frag สูงแต่ไร้ผล" และใช้ mode `'LIMITED'` สำรวจเบา (แล็บจริงเหลือ 3 แถวเช่น XMLPROPERTY 94.4% บน 2,677 pages) — อ่านต่อ: [Labs Ex2 Step 3](Labs/README.md)
+เกณฑ์มาตรฐาน: **REBUILD** เมื่อ > 30% (ทั้งหน้าใหม่หมด, แออัดกลับ 100%), **REORGANIZE** เมื่อ 5–30% (กวาดเฉพาะใน page, online เสมอ), **< 5% ปล่อย** — พร้อมเงื่อนไข `page_count > 1000` กันตัดสินจากตารางเล็กที่ "frag สูงแต่ไร้ผล" และใช้ mode `'LIMITED'` สำรวจเบา (แล็บจริงเหลือ 3 แถวเช่น XMLPROPERTY 94.4% บน 2,677 pages) — อ่านต่อ: [Labs Ex2 Step 4](Labs/README.md)
 </details>
 
 <details>

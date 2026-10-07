@@ -1,3 +1,5 @@
+-- MinVersion: SQL Server 2019 (15.x) · Database: AdventureWorks2025
+
 -- ============================================================================
 -- 09_Parallelism_CTFP_MAXDOP.sql
 -- Section 1.4 Wait Statistics — หัวข้อ 4: Parallel Execution (CTFP & MAXDOP)

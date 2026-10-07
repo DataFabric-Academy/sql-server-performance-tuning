@@ -132,7 +132,7 @@ CE ประเมินข้อมูลขาเข้ากว้างก�
 <details>
 <summary><b>เฉลย Q5</b> — B</summary>
 
-PLE เกณฑ์ 300 วินาทีมาจากยุค RAM 4–32 GB — บนเครื่องที่ buffer pool หลายสิบ GB ค่าปกติอาจหลักหมื่น (แล็บจริง 13,273 s บนเครื่องว่าง) — วิธีอ่านที่ถูก: ดู **trend (Sawtooth = pressure)** เทียบ baseline และ query ต่อ **Buffer Node** (`object_name LIKE '%Buffer Node%'`) เพราะค่ารวม instance ปิดบัง node ที่กดดันเฉพาะจุด — อ่านต่อ: [Labs Ex2 Step 3 ✅](Labs/README.md) + [Section 4.3 หัวข้อ PLE](Sections/03_Memory_Pressure_Diagnostics/README.md)
+PLE เกณฑ์ 300 วินาทีมาจากยุค RAM 4–32 GB — บนเครื่องที่ buffer pool หลายสิบ GB ค่าปกติอาจหลักหมื่น (แล็บจริง 13,273 s บนเครื่องว่าง) — วิธีอ่านที่ถูก: ดู **trend (Sawtooth = pressure)** เทียบ baseline และ query ต่อ **Buffer Node** (`object_name LIKE '%Buffer Node%'`) เพราะค่ารวม instance ปิดบัง node ที่กดดันเฉพาะจุด — อ่านต่อ: [Labs Ex2 Step 4 ✅](Labs/README.md) + [Section 4.3 หัวข้อ PLE](Sections/03_Memory_Pressure_Diagnostics/README.md)
 </details>
 
 <details>
@@ -207,7 +207,7 @@ Memory Grant Feedback แก้สองทิศ: **spill** (ขาด) → จ
 2. คู่กัน: Buffer Cache Hit Ratio (> 90–95%), `sys.dm_os_memory_clerks` (ใครโตขึ้นช่วงนั้น), page faults ของ process, และ wait `RESOURCE_SEMAPHORE` / `WRITE_PAGE` / `RESERVED_MEMORY_ALLOCATION_EXT`
 3. เทียบกับ **baseline ก่อนเกิดเหตุ** (Lab 10) — คำถามคือ "ต่างจากปกติของเครื่องนี้หรือไม่" ไม่ใช่ "ต่ำกว่า 300 วินาทีหรือยัง"
 
-อ่านต่อ: [Module README 7.3](README.md) + [Labs Ex2 Step 3 ✅](Labs/README.md)
+อ่านต่อ: [Module README 7.3](README.md) + [Labs Ex2 Step 4 ✅](Labs/README.md)
 </details>
 
 <details>

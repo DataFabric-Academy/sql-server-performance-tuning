@@ -7,7 +7,7 @@
 
 | แล็บ | Ex | ผู้รัน | วันที่/Build | ไฮไลต์ค่าจริงที่จับได้ |
 |---|---|---|---|---|
-| M1 Wait & CPU | 4 | ผู้ประสานงาน | 10-01 / .1000.7 | `SOS_SCHEDULER_YIELD` 6,689→17,185, runnable=2, ASYNC_NETWORK_IO + blocking chain จริง |
+| M1 Wait & CPU | 5 | ผู้ประสานงาน | 10-01 / .1000.7 | `SOS_SCHEDULER_YIELD` 6,689→17,185, runnable=2, ASYNC_NETWORK_IO + blocking chain จริง *(10-07 เพิ่ม Ex3 แขวน transaction — รอ re-sign-off ตามหัวข้อ 4)* |
 | M2 I/O | 3 | หน่วยงาน M2 | 10-01 / .1135.8 | cold/warm reads 274, log write latency ~1 ms, ROWS latency พุ่ง ~87 ms แล้วเจือจาง |
 | M3 Structures | 4 | หน่วยงาน M3 | 10-02 / .1135.8 | DBCC PAGE จริง (1:736), GUID frag 98.5% vs identity 1.2%, VLF 6 ชิ้นมีร่องรอย autogrowth |
 | M4 Memory | 4 | หน่วยงาน M4 | 10-02 / .1135.8 | grant 667 MB ใช้จริง 12 MB, feedback หดเหลือ 18 MB (`sys.query_store_plan_feedback`), PLE 13,273 s |
@@ -47,11 +47,25 @@
 
 | เกณฑ์ | ผล |
 |---|---|
-| `**Expected:**` ครบ 40/40 Exercise (รูปแบบตายตัว) | ✅ 43 บล็อก / 40 Exercise (M1 Ex3 + M9 Ex3 มี per-step Expected เพิ่ม — ผ่านการตรวจแล้ว) และ "ผลที่คาดหวัง" รูปแบบเก่า = 0 ทุกไฟล์ |
+| `**Expected:**` ครบทุก Exercise (รูปแบบตายตัว) | ✅ 44 บล็อก / 41 Exercise (10-07 เพิ่ม M1 Ex3 แขวน transaction — มี Expected ครบ, รอ re-sign-off ตามหัวข้อ 4) และ "ผลที่คาดหวัง" รูปแบบเก่า = 0 ทุกไฟล์ |
 | "ต้องรู้ก่อน" ครบทุก Exercise ที่ใช้ syntax เกิน SELECT/JOIN | ✅ ครบ (36 ที่มี trigger syntax มี blockquote ทุกจุด — ตรวจโดยผู้ตรวจอิสระ ยกเว้น M8 ซึ่งรายงานครบจากหน่วยงาน M8) |
 | "ทางเลือกสำหรับรุ่นเก่า" ครบทุกบล็อก 2025-only | ✅ M5 Ex4 + M5 README 8.1 (M9 ถูกเขียนใหม่เป็น version-neutral พร้อมคำเตือน) |
 | Hard guard IF…THROW ใน md 2025-only | ✅ M5 Labs Ex4 + M5 README 8.1 (syntax พิสูจน์บน 17.x แล้ว) |
 | `MinVersion:` ใน .sql | ✅ 69/69 |
 | sign-off รันจริงบน 17.x ทุกแล็บ | ✅ เอกสารฉบับนี้ (11/11 แล็บ) |
 
-**คงเหลือตามแผน:** Module 0 ฉบับขั้นต่ำ · แก้สัญญา Guide :142/:157 · quiz bank 11 โมดูล · ขยายเนื้อหา 31/36 sections (M5→M9→M11) · เด็คเปิดคอร์ส + เด็คเต็มตามคิว · ผู้เรียนทดลองเดิน 3 แล็บเต็มสาย (DoD ข้อ 6) · นโยบาย git สำหรับ artifacts
+**คงเหลือตามแผน:** Module 0 ฉบับขั้นต่ำ · แก้สัญญา Guide :142/:157 · quiz bank 11 โมดูล · ขยายเนื้อหา 31/36 sections (M5→M9→M11) · เด็คเปิดคอร์ส + เด็คเต็มตามคิว · ผู้เรียนทดลองเดิน 3 แล็บเต็มสาย (DoD ข้อ 6) · นโยบาย git สำหรับ artifacts · re-sign-off รอบแก้ไข 10-07 (หัวข้อ 4)
+
+## 4) รอบแก้ไข 2026-10-07 — บังคับหลัก "simulate ก่อนวัด" ทุก Exercise (รอ re-sign-off)
+
+บทเรียนจากการสอนจริง (โน้ตผู้สอนห้อง AIS): exercise ที่วัด DMV บนเซิร์ฟเวอร์ว่างจะไม่เห็นอะไร — ทบทวนทั้ง 11 แล็บแล้ว เหลือ 4 จุดที่แก้ใน md และ**ต้องรันจริงบน 17.x อีกรอบ**เพื่อเติม blockquote อ้างอิงรันจริง:
+
+| จุดที่แก้ | สิ่งที่เพิ่ม/เปลี่ยน | สถานะ |
+|---|---|---|
+| M1 Ex3 (ใหม่) | Exercise "เห็น Wait แรก — การแขวนของ Transaction": Window A `BEGIN TRAN` + UPDATE ค้าง → Window B UPDATE แถวเดียวกัน (แขวน LCK_M_X) → Window C ดู `dm_exec_requests` → ROLLBACK → เช็ค `LCK_M_X` ใน wait stats; สคริปต์ใหม่ `Sections/04_Wait_Statistics/Scripts/10_Hanging_Transaction_Primer.sql` (70/70); อิง 10987C Demofiles Mod01 Demo2 | ⏳ รอรันจริง |
+| M1 Ex2 Step 3 (ใหม่, optional) + `08_Wait_Stats_Analysis.sql` | จัดอันดับ Top 20 ตาม **avg wait ต่อจำนวนครั้ง** (จับ wait แพงต่อครั้งที่ total-time ranking มองข้าม) — กรอง benign แบบย่อ + `waiting_tasks_count >= 100` | ⏳ รอรันจริง |
+| M4 Ex2 | เพิ่ม Step 1 อุ่น buffer (`CHECKPOINT` + `DROPCLEANBUFFERS` + สแกน 4 ตาราง) ก่อนวัด; Step 4 ใหม่ query เทียบ **PLE Buffer Manager vs Buffer Node ในชุดเดียว** — ตีความ: Buffer Manager = ค่าเฉลี่ยทั้ง instance **ใช้ตัดสิน memory pressure ไม่ได้บนหลาย NUMA node** ต้องใช้ Buffer Node ราย node (บน VM 1 node สองค่าจะเท่ากัน) | ⏳ รอรันจริง (ค่า PLE node 000 = 13,273 s ยังอ้างได้จากโครงเดิม) |
+| M6 Ex2 | เพิ่ม Step 1 สร้าง activity (SELECT ผ่าน NC index + UPDATE 1 แถว) ก่อนอ่าน `dm_db_index_usage_stats` — ไม่งั้น reads = 0 ทั้งตารางและตีความไม่ได้ | ⏳ รอรันจริง |
+| M9 Ex3 | เพิ่ม Step 2 สร้าง query นาน 4 วิ (`WAITFOR DELAY`) ก่อนอ่าน .xel อย่างชัดเจน — **สอดคล้องกับ evidence เดิมแล้ว** (รอบ sign-off จับ batch `WAITFOR DELAY '00:00:04'` ได้ `duration_s = 4.018` จริง แต่ขั้นตอนหลุดจากเนื้อแล็บ) | ✅ ข้อความตรง evidence เดิม (แนะนำยืนยันรอบถัดไป) |
+
+หลัง re-sign-off ครบ: อัปเดต blockquote "อ้างอิงรันจริง" ที่รออยู่ (M1 Ex3, M4 Step 4, M6 Step 2) และนับ Expected ใหม่ (ขณะนี้ 44 บล็อก / 41 Exercise)

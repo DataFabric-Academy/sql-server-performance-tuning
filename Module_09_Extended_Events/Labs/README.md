@@ -183,7 +183,20 @@ ALTER EVENT SESSION [XE_LongRunning] ON SERVER STATE = START;
 
 > ⚠️ predicate ของ event session **ใส่ฟังก์ชันอย่าง `DB_ID()` ตรง ๆ ไม่ได้** (ได้ `Incorrect syntax near 'DB_ID'` — ตรวจจริงบน 17.0.1135.8) ให้ใช้ `sqlserver.database_name = N'...'` หรือใส่ค่า `database_id` ตัวเลขตรง ๆ แทน (หาค่าด้วย `SELECT DB_ID('AdventureWorks2025');`)
 
-### Step 2 — อ่านไฟล์ .xel ด้วย T-SQL
+### Step 2 — สร้าง query ที่วิ่งนานเกิน 3 วินาที (simulate ก่อนเสมอ)
+
+session นี้จับเฉพาะ event ที่ duration > 3 วินาที — ถ้าข้ามขั้นนี้ บนเซิร์ฟเวอร์ว่างไฟล์ .xel จะว่างเปล่าและ Step 3 จะไม่เห็นอะไรเลย:
+
+```sql
+USE AdventureWorks2025;
+GO
+WAITFOR DELAY '00:00:04';               -- จงใจรอ 4 วินาที (> 3 วิ ที่ predicate กำหนด)
+SELECT COUNT(*) FROM Sales.SalesOrderDetail;
+```
+
+> รออย่างน้อย `MAX_DISPATCH_LATENCY` (10 วินาที) หลัง batch จบ ก่อนไปอ่านไฟล์ใน Step 3
+
+### Step 3 — อ่านไฟล์ .xel ด้วย T-SQL
 
 > **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): `sys.fn_xe_file_target_read_file(...)` คือ TVF อ่านไฟล์ .xel ทีละแถว แล้ว `CROSS APPLY ( SELECT CAST(f.event_data AS XML) )` แปลงแต่ละแถวเป็น XML — ที่นี่ root ของ XML คือ `<event>` เอง จึงต้องเขียน path แบบ `event/data/...` (ต่างจาก Exercise 1–2 ที่ bind ที่ตัว `<event>` ผ่าน `nodes()` แล้ว จึงห้ามนำหน้าด้วย `event/`) — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
 
@@ -202,7 +215,7 @@ ORDER BY event_time DESC;
 **Expected:** ได้แถวต่อ event ที่ผ่านเงื่อนไข (duration > 3 วิ และอยู่ใน DB ที่ระบุ) จากทุกไฟล์ .xel ที่ rollover ไว้; `event_name` เป็น `sql_batch_completed` (batch จาก sqlcmd/SSMS) หรือ `rpc_completed` (เรียก proc แบบมี parameter จาก application); คอลัมน์ `[user]` มีค่าเฉพาะแถว `rpc_completed` เพราะ action `username` ถูกขอไว้เฉพาะ event นั้น
 > อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: batch `WAITFOR DELAY '00:00:04'; SELECT COUNT(*)...` ถูกจับเป็น `sql_batch_completed` `duration_s = 4.018` (predicate `database_name` ทำงานถูกต้อง), `[user] = NULL` ตามดีไซน์ และไฟล์เดียวกันยังเก็บ event ย้อนหลังจากการรันก่อนหน้า (rollover ยังไม่ถึง)
 
-### Step 3 — จำกัดอายุ session กันลืมปิด (ทุกรุ่น 2008+)
+### Step 4 — จำกัดอายุ session กันลืมปิด (ทุกรุ่น 2008+)
 
 > ⚠️ **ห้ามสอน `WITH (AUTO_STOP = ON)`** — option นี้ไม่มีอยู่จริงใน SQL Server 2025 (ตรวจจริงบน 17.0.1000.7 แล้วได้ `Incorrect syntax near 'AUTO_STOP'`) วิธีจริงคือกำหนดขนาด target แล้วปิดตามเวลาด้วย SQL Agent job หรือคำสั่ง `STATE = STOP`
 

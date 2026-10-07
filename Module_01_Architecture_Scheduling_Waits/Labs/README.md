@@ -15,10 +15,11 @@
 
 ## Objectives
 
-1. ตรวจสอบ CPU/NUMA topology ของ instance
-2. Monitor Schedulers และหาสัญญาณ CPU pressure
-3. วิเคราะห์ Wait Statistics แยก Resource Waits vs Signal Waits
-4. จำลอง workload จริงและติดตาม wait แบบ real-time
+1. เห็น wait ที่ง่ายที่สุดก่อน — การแขวนของ transaction (blocking) จริง ๆ
+2. ตรวจสอบ CPU/NUMA topology ของ instance
+3. Monitor Schedulers และหาสัญญาณ CPU pressure
+4. วิเคราะห์ Wait Statistics แยก Resource Waits vs Signal Waits
+5. จำลอง workload จริงและติดตาม wait แบบ real-time
 
 ---
 
@@ -146,18 +147,108 @@ ORDER BY wait_s DESC;
 > **benign waits คืออะไร / ทำไมต้องกรอง**: wait types เช่น `SLEEP_TASK`, `XE_TIMER_EVENT`, `BROKER_*` เกิดจาก background task ของตัว SQL Server เอง สะสมนาน ๆ จะบวม Top waits จนปัญหาจริงจมหาย — บล็อก `WHERE wait_type NOT IN (...)` ใช้กรองรายชื่อพวกนี้ออกก่อนจัดอันดับ (รายชื่ออ้างแนวทาง Glenn Berry)
 
 **Expected:** `signal_wait_pct` ต่ำกว่า ~10–15% บน instance ปกติ; Top waits ก่อน workload มักถูกจังหวะ background/preemptive ops ไม่ใช่ `SOS_SCHEDULER_YIELD`
-> อ้างอิงรันจริง SQL Server 2025 RTM (17.0.1000.7), 2026-10-01: `signal_wait_pct = 3.9%`, Top-1 = `PREEMPTIVE_OS_CRYPTOPS` (77.1%) — และหลังรัน workload (Ex3) `SOS_SCHEDULER_YIELD` เพิ่มจาก 6,689 → 17,185 ครั้ง (signal 0.89s → 10.48s) แต่ `signal_wait_pct` รวมยังไม่ขยับเพราะถูกเจือด้วย `ASYNC_NETWORK_IO` จากการรันผ่าน WAN — ในห้องเรียน (localhost/LAN) จะเห็น `signal_wait_pct` พุ่งชัดกว่า
+> อ้างอิงรันจริง SQL Server 2025 RTM (17.0.1000.7), 2026-10-01: `signal_wait_pct = 3.9%`, Top-1 = `PREEMPTIVE_OS_CRYPTOPS` (77.1%) — และหลังรัน workload (Ex4) `SOS_SCHEDULER_YIELD` เพิ่มจาก 6,689 → 17,185 ครั้ง (signal 0.89s → 10.48s) แต่ `signal_wait_pct` รวมยังไม่ขยับเพราะถูกเจือด้วย `ASYNC_NETWORK_IO` จากการรันผ่าน WAN — ในห้องเรียน (localhost/LAN) จะเห็น `signal_wait_pct` พุ่งชัดกว่า
+
+### Step 3 (Optional) — จัดอันดับด้วย avg wait ต่อจำนวนครั้ง (มุมมองเสริม)
+
+```sql
+SELECT TOP (20) wait_type, waiting_tasks_count,
+       wait_time_ms / 1000.0 AS total_wait_s,
+       wait_time_ms / NULLIF(waiting_tasks_count, 0) / 1000.0 AS avg_wait_s,
+       CAST(100.0 * wait_time_ms / SUM(wait_time_ms) OVER () AS DECIMAL(10,1)) AS pct_total
+FROM sys.dm_os_wait_stats
+WHERE waiting_tasks_count >= 100        -- กัน wait ที่เกิดครั้งเดียวลอยขึ้นอันดับ
+  AND wait_time_ms > 0
+  AND wait_type NOT LIKE 'SLEEP%'       -- กรอง idle/background หลัก ๆ (รายชื่อเต็มใน Step 2)
+  AND wait_type NOT LIKE 'BROKER%'
+  AND wait_type NOT LIKE 'XE%'
+  AND wait_type NOT LIKE 'HADR%'
+  AND wait_type NOT LIKE 'QDS%'
+  AND wait_type NOT LIKE 'PREEMPTIVE%'
+  AND wait_type NOT LIKE 'WAITFOR%'
+ORDER BY avg_wait_s DESC;
+```
+
+✅ **สังเกต**: การจัดอันดับด้วย **ค่าเฉลี่ยต่อครั้ง** จับ wait ที่ "แพงต่อครั้ง" ซึ่งการจัดอันดับด้วย total wait มองข้าม (เกิดไม่บ่อย แต่พอเกิดทีก็แพง) — ใช้คู่กับ Step 2 อย่าตัดสินจากมุมเดียว
 
 ---
 
-## Exercise 3: จำลอง CPU Pressure (Window B)
+## Exercise 3: เห็น Wait แรก — การแขวนของ Transaction (Window A/B)
+
+### Step 1 — Window A: เปิด transaction ค้างไว้ (ผู้ถือ lock)
+
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): `BEGIN TRANSACTION` เริ่มธุรกรรมที่ยังไม่ถูก commit — ทุกแถวที่ UPDATE จะถูกล็อกด้วย X lock จนกว่าจะ `COMMIT`/`ROLLBACK` — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
+
+```sql
+-- Window A: รันแล้ว "ปล่อยค้างไว้" — ยังไม่ต้องรัน ROLLBACK
+BEGIN TRANSACTION;
+
+UPDATE Person.Person
+SET ModifiedDate = ModifiedDate      -- ค่าเดิม (no-op) แต่ได้ X lock ครบ
+WHERE BusinessEntityID = 235;
+
+-- ROLLBACK;   -- ห้ามรันตอนนี้ — รันตอน Step 4
+```
+
+### Step 2 — Window B: มาแตะแถวเดียวกัน (จะแขวน)
+
+```sql
+-- Window B: รันแล้ว query จะไม่จบ — ทิ้งไว้แขวน ~30 วินาที
+UPDATE Person.Person
+SET ModifiedDate = ModifiedDate
+WHERE BusinessEntityID = 235;
+```
+
+✅ **สังเกต**: หน้าต่าง B "ค้างไปเอง" โดยไม่มี error — สิ่งที่ผู้ใช้เรียกว่า "ระบบแขวน" ในมุมของ SQL Server คือ **wait** ตัวหนึ่ง
+
+### Step 3 — Window C: มองการแขวนจากมุม engine
+
+```sql
+SELECT r.session_id,
+       r.status,                      -- suspended = กำลังรอ
+       r.wait_type,                   -- LCK_M_X = ขอ X lock แล้วยังไม่ได้
+       r.wait_time,                   -- ms ที่รอมาแล้ว (เดินขึ้นเรื่อย ๆ)
+       r.blocking_session_id,         -- ชี้ Session A = head blocker
+       r.wait_resource
+FROM sys.dm_exec_requests AS r
+WHERE r.blocking_session_id <> 0;
+```
+
+✅ **สังเกต**: `wait_type = LCK_M_X` และ `blocking_session_id` = SPID ของ Window A — wait ทุกชนิดที่จะเจอใน Top waits ต่อจากนี้เกิดด้วยกลไก "รอ resource" เดียวกับที่เพิ่งเห็น ต่างกันแค่ชนิด resource
+
+### Step 4 — Window A: ปลดแขวน
+
+```sql
+ROLLBACK;   -- Window B จะรันจบทันที
+```
+
+### Step 5 — ตรวจว่าการแขวนขึ้นในสถิติรวมจริง
+
+```sql
+SELECT wait_type, waiting_tasks_count,
+       wait_time_ms / 1000.0 AS total_wait_s,
+       wait_time_ms / NULLIF(waiting_tasks_count, 0) / 1000.0 AS avg_wait_s
+FROM sys.dm_os_wait_stats
+WHERE wait_type = 'LCK_M_X';
+```
+
+**Expected:** ระหว่างแขวน Window C เห็นแถวของ Window B `status = suspended`, `wait_type = LCK_M_X`, `blocking_session_id` = SPID ของ Window A และ `wait_time` เดินขึ้นเรื่อย ๆ; หลัง ROLLBACK Window B จบทันที และ Step 5 เห็น `LCK_M_X` มี `waiting_tasks_count ≥ 1` โดย `avg_wait_s` ≈ ระยะเวลาที่ทิ้งแขวนไว้
+> อ้างอิงรันจริง: **รอ sign-off รอบถัดไปบน SQL Server 2025 (17.x)** — กลไกยืนยันแล้วจากการรันจริงรอบก่อน (Exercise 5 พบโดยบังเอิญว่า session ที่ค้างสตรีมผลถือ lock ไป block `ALTER DATABASE` ด้วย `LCK_M_X`) และเดโมรูปแบบนี้ใช้สอนจริงในห้องเรียนตามโน้ตผู้สอน — รูปแบบอิงจาก 10987C Demofiles Mod01 Demo2
+
+> **เกร็ด**: ใช้ UPDATE → UPDATE โดยเจตนา — บน DB ที่เปิด RCSI (VM ห้องเรียนตั้งไว้แล้ว) SELECT ธรรมดาจะไม่โดน block แต่ UPDATE ทับแถวเดิมยังต้องได้ X lock เสมอ จึงเดโมได้ทุกเครื่อง; ตัวเต็มเรื่อง lock chain / deadlock / isolation levels อยู่ **Lab 5 (Module 05)**
+> **ข้อควรระวัง**: ห้ามทิ้ง transaction ค้าง — ถ้าปิด SSMS ทั้งที่ยังถือ lock session ฝั่ง server จะค้างถือ lock ต่อไป (sleeping + open transaction) และ block คนอื่นต่อ — ตรวจ/เคลียร์ด้วย Cleanup ข้อ 1b ท้ายแล็บ
+> สคริปต์ฉบับเต็ม: `Sections/04_Wait_Statistics/Scripts/10_Hanging_Transaction_Primer.sql`
+
+---
+
+## Exercise 4: จำลอง CPU Pressure (Window B)
 
 ### Step 1 — รัน workload กิน CPU (คำนวณหนัก ๆ วนลูป)
 
 > **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): `WHILE` = ลูปแบบ procedural ของ T-SQL ใช้ที่นี่เพื่อวนคำนวณเผา CPU จำลอง workload — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
 
 ```sql
--- Window B: รันทิ้งไว้ (~60 วินาที) แล้วไปทำ Exercise 4 ที่ Window C
+-- Window B: รันทิ้งไว้ (~60 วินาที) แล้วไปทำ Exercise 5 ที่ Window C
 SET NOCOUNT ON;   -- สำคัญ: ถ้าไม่ปิด NOCOUNT ทุก iteration จะส่ง "N rows affected" กลับ client
                   -- บน client ที่ช้า/ไกล (WAN) session จะติด ASYNC_NETWORK_IO แทนการกิน CPU
 DECLARE @n BIGINT = 0, @i BIGINT = 0;
@@ -218,7 +309,7 @@ WHERE s.is_user_process = 1 AND r.session_id <> @@SPID;
 
 ---
 
-## Exercise 4: จำลอง ASYNC_NETWORK_IO (Client รับไม่ทัน)
+## Exercise 5: จำลอง ASYNC_NETWORK_IO (Client รับไม่ทัน)
 
 ### Step 1 — ส่ง result set ใหญ่ช้า ๆ ไปที่ client
 
@@ -249,9 +340,10 @@ WHERE session_id <> @@SPID;
 
 ## Wrap-up: คำถามท้ายแล็บ
 
-1. Signal Wait Ratio ของ instance ก่อน/หลัง workload ต่างกันเท่าไร? สรุปได้ว่า CPU เป็น bottleneck จริงหรือไม่?
-2. `SOS_SCHEDULER_YIELD` กับ `CXPACKET` ต่างกันอย่างไรในเชิงการตีความ?
-3. ถ้า `runnable_tasks_count` ค้าง > 0 ตลอดเวลา แต่ CPU utilization แค่ 60% — เป็นไปได้ไหม? เพราะอะไร (Hint: single-threaded query / SOS Scheduler)
+1. ใน Exercise 3 การแขวนของ Window B คือ wait type อะไร และคอลัมน์ใดของ `sys.dm_exec_requests` บอกว่าใครเป็นคนทำให้แขวน? (`LCK_M_X` / `blocking_session_id`)
+2. Signal Wait Ratio ของ instance ก่อน/หลัง workload ต่างกันเท่าไร? สรุปได้ว่า CPU เป็น bottleneck จริงหรือไม่?
+3. `SOS_SCHEDULER_YIELD` กับ `CXPACKET` ต่างกันอย่างไรในเชิงการตีความ?
+4. ถ้า `runnable_tasks_count` ค้าง > 0 ตลอดเวลา แต่ CPU utilization แค่ 60% — เป็นไปได้ไหม? เพราะอะไร (Hint: single-threaded query / SOS Scheduler)
 
 ## Cleanup
 
@@ -261,6 +353,12 @@ WHERE session_id <> @@SPID;
 SELECT session_id, wait_type, cpu_time FROM sys.dm_exec_requests WHERE session_id > 50;
 -- KILL <session_id>;  -- ถ้ายังเห็น workload ค้างอยู่
 
+-- 1b) เช็ค transaction ค้างจาก Exercise 3 (BEGIN TRAN ที่ลืม ROLLBACK — จะยังถือ lock block คนอื่นต่อ)
+SELECT session_id, program_name, status, open_transaction_count
+FROM sys.dm_exec_sessions
+WHERE open_transaction_count > 0 AND is_user_process = 1;
+-- KILL <session_id>;  -- ถ้าเจอ transaction ของแล็บค้างอยู่ (KILL จะ ROLLBACK ให้เอง)
+
 -- 2) Reset wait stats (ทำเฉพาะบน VM ทดสอบ — ห้ามรันบน Production เพราะค่าสะสมจะหาย)
 DBCC SQLPERF('sys.dm_os_wait_stats', CLEAR);
 ```
@@ -268,6 +366,7 @@ DBCC SQLPERF('sys.dm_os_wait_stats', CLEAR);
 ## แหล่งอ้างอิง
 
 - 10987C Lab01 (CPU and NUMA, Monitor Schedulers, Waits) — `Trainer_Docs/10987/Labfiles/Lab01/`
+- 10987C Demofiles Mod01 Demo2 (Create hanging transaction / Start blocked transaction / DMV queries) — `Trainer_Docs/10987/Demofiles/Mod01/`
 - Microsoft Learn: [sys.dm_os_wait_stats](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql) · [sys.dm_os_schedulers](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-os-schedulers-transact-sql) · [Thread and Task Architecture Guide](https://learn.microsoft.com/sql/relational-databases/thread-and-task-architecture-guide)
 - Glenn Berry: [SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
 - สคริปต์ของแล็บนี้อยู่ใน `Sections/*/Scripts/` ของโมดูล จัดตามหัวข้อที่เกี่ยวข้อง (ลิงก์ในแต่ละ Exercise)

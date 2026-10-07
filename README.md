@@ -145,7 +145,7 @@ Module_XX_Topic/
 - **Total Modules**: 11
 - **Total Scripts**: 100+ SQL scripts
 - **Workload Scripts**: 15+
-- **Lab Exercises**: 50+
+- **Lab Exercises**: 41 (11 Labs)
 
 ---
 

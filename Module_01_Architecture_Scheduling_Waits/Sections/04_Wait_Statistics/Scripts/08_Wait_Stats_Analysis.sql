@@ -83,3 +83,34 @@ GROUP BY
 HAVING SUM(W2.[Percentage]) - MAX(W1.[Percentage]) < 99.0 -- cumulative threshold
 ORDER BY
     [Wait Percentage] DESC;
+
+-- =============================================
+-- Top 20 by Average Wait per Occurrence (มุมมองเสริม)
+-- การจัดอันดับด้วย total wait (query บน) มองข้าม wait ที่ "แพงต่อครั้ง"
+-- (เกิดไม่บ่อย แต่พอเกิดทีก็แพง เช่น RESOURCE_SEMAPHORE) — มุมนี้ช่วยจับพวกนั้น
+-- กรอง waiting_tasks_count >= 100 กัน wait ที่เกิดครั้งเดียวลอยอันดับ 1
+-- หมายเหตุ: กรอง background/idle waits แบบย่อด้วย pattern — รายชื่อเต็มอยู่ใน query แรก
+-- =============================================
+SELECT TOP (20)
+    ws.wait_type
+,   ws.waiting_tasks_count
+,   ws.wait_time_ms / 1000.0 AS total_wait_s
+,   ws.wait_time_ms / NULLIF(ws.waiting_tasks_count, 0) / 1000.0 AS avg_wait_s
+,   CAST(100.0 * ws.wait_time_ms / SUM(ws.wait_time_ms) OVER() AS DECIMAL(5, 2)) AS pct_total
+FROM sys.dm_os_wait_stats AS ws
+WHERE ws.waiting_tasks_count >= 100
+  AND ws.wait_time_ms > 0
+  AND ws.wait_type NOT LIKE 'SLEEP%'
+  AND ws.wait_type NOT LIKE 'BROKER%'
+  AND ws.wait_type NOT LIKE 'XE%'
+  AND ws.wait_type NOT LIKE 'HADR%'
+  AND ws.wait_type NOT LIKE 'QDS%'
+  AND ws.wait_type NOT LIKE 'DBMIRROR%'
+  AND ws.wait_type NOT LIKE 'PREEMPTIVE%'
+  AND ws.wait_type NOT LIKE 'WAITFOR%'
+  AND ws.wait_type NOT IN (N'CHECKPOINT_QUEUE', N'CHKPT', N'DIRTY_PAGE_POLL'
+                         , N'DISPATCHER_QUEUE_SEMAPHORE', N'EXECSYNC', N'FSAGENT'
+                         , N'KSOURCE_WAKEUP', N'LAZYWRITER_SLEEP', N'LOGMGR_QUEUE'
+                         , N'REQUEST_FOR_DEADLOCK_SEARCH', N'RESOURCE_QUEUE'
+                         , N'SQLTRACE_BUFFER_FLUSH')
+ORDER BY avg_wait_s DESC;

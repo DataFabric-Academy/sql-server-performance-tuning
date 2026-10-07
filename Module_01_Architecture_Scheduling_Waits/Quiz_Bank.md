@@ -124,7 +124,7 @@ Signal Wait = ของมาแล้วแต่ **รอ CPU ว่าง** (
 <details>
 <summary><b>เฉลย Q7</b> — B</summary>
 
-`ASYNC_NETWORK_IO` = SQL **พร้อมส่งแต่ client รับไม่ทัน** — แก้ฝั่ง application (streaming, TOP, chunking) ไม่ใช่แก้ storage และแล็บรันจริงพบ chain สด: session ที่ค้างสตรีมผล **ถือ lock ค้าง** ไป block คำสั่ง `ALTER DATABASE` ของ session อื่น (`LCK_M_X`) — อ่านต่อ: [Labs Ex4](Labs/README.md) + [Section 1.4](Sections/04_Wait_Statistics/README.md)
+`ASYNC_NETWORK_IO` = SQL **พร้อมส่งแต่ client รับไม่ทัน** — แก้ฝั่ง application (streaming, TOP, chunking) ไม่ใช่แก้ storage และแล็บรันจริงพบ chain สด: session ที่ค้างสตรีมผล **ถือ lock ค้าง** ไป block คำสั่ง `ALTER DATABASE` ของ session อื่น (`LCK_M_X`) — อ่านต่อ: [Labs Ex5](Labs/README.md) + [Section 1.4](Sections/04_Wait_Statistics/README.md)
 </details>
 
 <details>
@@ -168,7 +168,7 @@ Scheduler ที่มองเห็นสำหรับ workload ผู้ใ
 
 เหตุผล: ตัวเลข `signal_wait_pct` เป็น **สัดส่วนเทียบกับ wait ทั้งหมดของ instance** — การรันแล็บผ่าน WAN ทำให้ `ASYNC_NETWORK_IO` (รอ client รับผล) ถูกเติมเข้าตัวหารจำนวนมาก จึง "เจือจาง" สัดส่วนของ signal wait ลง แม้เวลา signal จริงโตจาก 0.89s → 10.48s (มากกว่า 10 เท่า) ก็ตาม
 
-บน **localhost/LAN ในห้องเรียน** ไม่มี ASYNC_NETWORK_IO มาเจือ จึงจะเห็น `signal_wait_pct` พุ่งชัดเจนตาม workload — บทเรียนคือตีความ ratio ต้องดู **ตัวเลขดิบ (signal seconds) คู่กับสัดส่วน** และรู้บริบท workload — อ่านต่อ: [Labs Ex3 Step 4 — Expected](Labs/README.md)
+บน **localhost/LAN ในห้องเรียน** ไม่มี ASYNC_NETWORK_IO มาเจือ จึงจะเห็น `signal_wait_pct` พุ่งชัดเจนตาม workload — บทเรียนคือตีความ ratio ต้องดู **ตัวเลขดิบ (signal seconds) คู่กับสัดส่วน** และรู้บริบท workload — อ่านต่อ: [Labs Ex4 Step 4 — Expected](Labs/README.md)
 </details>
 
 <details>

@@ -90,7 +90,21 @@ SET STATISTICS IO OFF;
 
 ## Exercise 2: Unused / Duplicate Index วิเคราะห์ก่อนทิ้ง
 
-### Step 1 — รวมสถิติอ่าน vs เขียนต่อ index (สไตล์ Glenn Berry)
+### Step 1 — สร้าง activity ก่อนอ่านสถิติ (simulate ก่อนเสมอ)
+
+`dm_db_index_usage_stats` นับเฉพาะหลัง SQL Server restart ล่าสุด — บนเซิร์ฟเวอร์ที่เพิ่งเปิด ทุก index จะยังเป็น 0 ทั้งหมดจนอ่านอะไรไม่ออก รัน workload เล็ก ๆ นี้ก่อนเพื่อให้มีข้อมูลจริงให้ตีความ:
+
+```sql
+USE AdventureWorks2025;
+GO
+-- SELECT ผ่าน NC index (LastName / ProductID) → user_seeks เดิน
+SELECT TOP (10) FirstName, LastName FROM Person.Person WHERE LastName = N'Smith';
+SELECT TOP (10) * FROM Sales.SalesOrderDetail WHERE ProductID = 897;
+-- UPDATE เขียนแถวเดียว (ค่าเดิม ไม่เปลี่ยนข้อมูล) → user_updates เดิน
+UPDATE TOP (1) Person.Person SET ModifiedDate = ModifiedDate WHERE BusinessEntityID = 1;
+```
+
+### Step 2 — รวมสถิติอ่าน vs เขียนต่อ index (สไตล์ Glenn Berry)
 
 ```sql
 SELECT OBJECT_SCHEMA_NAME(i.object_id) AS schema_name,
@@ -112,7 +126,7 @@ ORDER BY total_reads ASC, total_writes DESC;
 
 ✅ **เกณฑ์ตัดสินใจ**: `total_reads = 0` แต่ `total_writes` สูง → ผู้สมัครถูก DROP (ยืนยันว่าไม่ใช่ PK/Unique constraint และไม่ใช่ index ที่ batch รายเดือนใช้ — ต้องมี baseline ยาว ≥ 1 business cycle)
 
-### Step 2 — หา duplicate index (Column key ซ้ำกัน)
+### Step 3 — หา duplicate index (Column key ซ้ำกัน)
 
 > **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): บล็อกนี้ใช้ **correlated subquery** (subquery ที่อ้างคอลัมน์ของแถวภายนอก `i` เพื่อรวมชื่อคอลัมน์ key/include ต่อ 1 index) และ **STRING_AGG ... WITHIN GROUP** (รวมค่าหลายแถวเป็น string เดียว โดยกำหนดลำดับการต่อได้) — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
 > ⚠️ **แก้จากต้นฉบับจากการรันจริง**: subquery ต้นฉบับอ้าง `c.name` โดยไม่มี JOIN `sys.columns` ทำให้ error `The multi-part identifier "c.name" could not be bound` — ต้องเพิ่ม JOIN เข้าไปตามด้านล่าง
@@ -135,7 +149,7 @@ WHERE index_id > 1 AND OBJECTPROPERTY(object_id, 'IsUserTable') = 1
 ORDER BY table_name, key_cols;
 ```
 
-### Step 3 (Optional) — หา fragmentation ที่ควรจัดการ
+### Step 4 (Optional) — หา fragmentation ที่ควรจัดการ
 
 > **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): `sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, 'LIMITED')` คือ **table-valued function ที่รับพารามิเตอร์** (scope ของ object, mode การสำรวจ) วางใน FROM ได้เหมือนตาราง — `'LIMITED'` = สำรวจแบบเบา (อ่านโครงสร้าง b-tree ระดับบนเท่านั้น) ใช้แค่ดู % fragmentation หยาบ ๆ — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
 
@@ -151,8 +165,8 @@ ORDER BY ps.avg_fragmentation_in_percent DESC;
 -- > 30% + ใหญ่พอ → REBUILD; 5-30% → REORGANIZE; < 5% ปล่อยไว้
 ```
 
-**Expected:** Step 1 เห็น index เรียงจาก reads น้อย → มาก (บน DB ที่เพิ่งเปิดใช้จะมีแถว reads = 0 เป็นจำนวนมาก) — จดผู้สมัครถูก DROP; Step 2 เห็น key_cols ต่อกันเป็นสายจัดกลุ่มหาซ้ำ/ซ้ำบางส่วน; Step 3 เหลือเฉพาะ index ใหญ่ (>1,000 pages) ที่กระจัดกระจายเกิน 30%
-> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: Step 1 — reads=0 เป็นร้อยแถว ตัวที่จ่ายแรมรับ เช่น `dbo.DatabaseLog.PK_DatabaseLog_DatabaseLogID` (reads 0 / writes 25); Step 2 — `HumanResources.Employee` มี `IX_Employee_OrganizationNode` (OrganizationNode) ทับ prefix ของ `IX_Employee_OrganizationLevel_OrganizationNode` (OrganizationLevel,OrganizationNode) — ซ้ำบางส่วนต้องวิเคราะห์ก่อนตัดสินใจ; Step 3 — 3 แถว: `Person.XMLPROPERTY_Person_Demographics` 94.4% (2,677 pages), `Person.PXML_Person_Demographics` 51.7% (2,912), `PK_SalesOrderDetail_SalesOrderID_SalesOrderDetailID` 41.3% (1,558)
+**Expected:** Step 2 เห็น index ที่ workload ใน Step 1 เพิ่งใช้ (เช่น `IX_Person_LastName_FirstName_MiddleName`, `IX_SalesOrderDetail_ProductID` และ PK ฝั่งที่ UPDATE) มี reads/writes > 0 ทันที ขณะที่ index ที่ไม่เคยถูกแตะตั้งแต่ restart ยังเป็น 0 — จัดเรียงจาก reads น้อย → มากเพื่อหาผู้สมัครถูก DROP (ยืนยันกับ baseline ยาวก่อนตัดสินใจเสมอ); Step 3 เห็น key_cols ต่อกันเป็นสายจัดกลุ่มหาซ้ำ/ซ้ำบางส่วน; Step 4 เหลือเฉพาะ index ใหญ่ (>1,000 pages) ที่กระจัดกระจายเกิน 30%
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), AdventureWorks, 2026-10-02: Step 2 — reads=0 เป็นร้อยแถว ตัวที่จ่ายแรมรับ เช่น `dbo.DatabaseLog.PK_DatabaseLog_DatabaseLogID` (reads 0 / writes 25); Step 3 — `HumanResources.Employee` มี `IX_Employee_OrganizationNode` (OrganizationNode) ทับ prefix ของ `IX_Employee_OrganizationLevel_OrganizationNode` (OrganizationLevel,OrganizationNode) — ซ้ำบางส่วนต้องวิเคราะห์ก่อนตัดสินใจ; Step 4 — 3 แถว: `Person.XMLPROPERTY_Person_Demographics` 94.4% (2,677 pages), `Person.PXML_Person_Demographics` 51.7% (2,912), `PK_SalesOrderDetail_SalesOrderID_SalesOrderDetailID` 41.3% (1,558) — *(ก่อนมี Step 1 สร้าง activity; รอ sign-off รอบถัดไปเพื่อยืนยันว่า index จาก workload ขึ้น reads/writes จริง)*
 
 ---
 

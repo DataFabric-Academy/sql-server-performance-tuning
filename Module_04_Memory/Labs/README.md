@@ -16,7 +16,7 @@ Report query หนึ่งช้าลงและมี Warning ใน execut
 ## Objectives
 
 1. ตรวจสุขภาพ memory ของ OS และ SQL Server
-2. วิเคราะห์ buffer pool ต่อ database และ memory clerks
+2. วิเคราะห์ buffer pool ต่อ database และ memory clerks พร้อมเทียบ PLE ระดับ instance (Buffer Manager) กับระดับ NUMA node (Buffer Node)
 3. จำลอง memory spill และสังเกต Memory Grant Feedback
 
 ---
@@ -63,7 +63,25 @@ ORDER BY pages_kb DESC;
 
 ## Exercise 2: Buffer Pool ต่อ Database (ใครกิน cache มากสุด)
 
-### Step 1 — นับ cached pages ต่อ database
+### Step 1 — อุ่น buffer pool ก่อนวัด (simulate ก่อนเสมอ)
+
+> **ต้องรู้ก่อน** (ใช้ syntax เกิน SELECT/JOIN): `DBCC DROPCLEANBUFFERS` = ล้างหน้าข้อมูล clean ออกจาก buffer pool ทั้งหมด (ต้อง `CHECKPOINT` ก่อนจึงไม่มี dirty page ค้าง) — ใช้ได้เฉพาะ **VM ทดสอบ/ห้องเรียน** เพราะทำให้ query ถัดไปช้าชั่วคราว — อ่านเพิ่มที่ [Glossary](../../Glossary.md)
+
+```sql
+USE AdventureWorks2025;
+GO
+CHECKPOINT;                 -- flush dirty pages ออกก่อน
+DBCC DROPCLEANBUFFERS;      -- ล้าง clean pages ออกจาก buffer pool (เฉพาะ VM ทดสอบ — ห้ามบน production)
+GO
+-- สแกนตารางใหญ่ด้วย workload ที่เราควบคุมเอง — ให้ตัวเลขที่จะวัดสะท้อน "การทดสอบของเรา"
+-- (ถ้าข้ามขั้นนี้ ผลที่ได้สะท้อน query เก่า ๆ ที่เคยรันไว้ก่อนหน้า ไม่ใช่สิ่งที่กำลังทดสอบ)
+SELECT COUNT_BIG(*) FROM Sales.SalesOrderDetail;
+SELECT COUNT_BIG(*) FROM Sales.SalesOrderHeader;
+SELECT COUNT_BIG(*) FROM Production.TransactionHistory;
+SELECT COUNT_BIG(*) FROM Person.Person;
+```
+
+### Step 2 — นับ cached pages ต่อ database
 
 ```sql
 SELECT CASE database_id WHEN 32767 THEN 'RESOURCE DB' ELSE DB_NAME(database_id) END AS database_name,
@@ -74,7 +92,7 @@ GROUP BY database_id
 ORDER BY cached_pages DESC;
 ```
 
-### Step 2 — ดู object ที่ cache หนักสุดใน AdventureWorks
+### Step 3 — ดู object ที่ cache หนักสุดใน AdventureWorks
 
 ```sql
 USE AdventureWorks2025;
@@ -92,19 +110,28 @@ GROUP BY p.object_id
 ORDER BY cached_pages DESC;
 ```
 
-### Step 3 — PLE แบบต่อ NUMA node (วิธีอ่านที่ถูกต้อง)
+### Step 4 — PLE: Buffer Manager vs Buffer Node (วิธีอ่านที่ถูกต้อง)
 
 ```sql
-SELECT instance_name AS numa_node, cntr_value AS page_life_expectancy_sec
+SELECT 'Buffer Manager (ค่าเฉลี่ยทั้ง instance)' AS scope, N'—' AS numa_node,
+       cntr_value AS page_life_expectancy_sec
+FROM sys.dm_os_performance_counters
+WHERE object_name LIKE '%Buffer Manager%'
+  AND counter_name = 'Page life expectancy'
+UNION ALL
+SELECT 'Buffer Node (ราย NUMA node)', instance_name, cntr_value
 FROM sys.dm_os_performance_counters
 WHERE object_name LIKE '%Buffer Node%'
-  AND counter_name = 'Page life expectancy';
+  AND counter_name = 'Page life expectancy'
+ORDER BY scope DESC, numa_node;
 ```
+
+✅ **หัวใจของการอ่านค่า**: **Buffer Manager PLE เป็นค่าเฉลี่ยรวมทุก node — ใช้ตัดสิน memory pressure ไม่ได้เมื่อมีหลาย NUMA node** เพราะถ้า node เดียวเดือดแต่อีก node สบาย ค่าเฉลี่ยก็ยังดูปกติ ให้ใช้ **Buffer Node PLE ราย node** ตัดสินเสมอ — ค่าที่หล่นฮวบเฉพาะ node ใด node หนึ่ง (หรือต่างกันมากระหว่าง node) คือ red flag ที่แท้จริง
 
 ✅ **เตือน**: อย่าใช้ PLE 300 วินาทีเป็นสายฟ้าแลบ — บนเครื่อง RAM หลายสิบ GB ค่าปกติอาจหลักหมื่นวินาที ให้ดู **trend ตกฮวบ** เทียบ baseline (Lab 10)
 
-**Expected:** database ที่ workload ใช้ล่าสุดจะกิน cache นำ (ที่นี่คือ AdventureWorks) และ tempdb ตามมาเป็นอันดับต้น ๆ; top object เปลี่ยนตาม query ล่าสุด ไม่ต้องตกใจถ้าลำดับไม่ตรงกับตัวอย่าง; PLE ต่อ node ระดับหลักพันขึ้นไปเป็นเรื่องปกติบนเครื่องที่ยังไม่กดดัน memory
-> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), 2026-10-02: AdventureWorks ~218 MB (27,961 pages), tempdb ~73 MB, RESOURCE DB ~22 MB; top object ช่วงนั้น = `xml_index_nodes_...` ~68 MB ตามด้วย `Person` ~32 MB, `SalesOrderDetail` ~19 MB; PLE node 000 = ~13,273 วินาที (1 NUMA node / 4 vCPU)
+**Expected:** หลัง Step 1 (อุ่น buffer) ตารางที่เพิ่งสแกน (SalesOrderDetail, TransactionHistory ฯลฯ) จะกิน cache นำชัดเจน และ AdventureWorks ขึ้นอันดับต้นของ Step 2 อย่างมีนัยยะ ไม่ใช่ขึ้นกับ query เก่า; ที่ Step 4 บนเครื่อง **1 NUMA node** ค่า Buffer Manager จะ **เท่ากับ** ค่า Buffer Node ทุกแถว (ค่าเฉลี่ย = ค่าเดียวเมื่อมี node เดียว) — จุดที่สองค่าต่างกันได้จริงคือ production หลาย NUMA ซึ่งต้องเชื่อฝั่ง Buffer Node เท่านั้น
+> อ้างอิงรันจริง SQL Server 2025 RTM-GDR (17.0.1135.8), 2026-10-02: AdventureWorks ~218 MB (27,961 pages), tempdb ~73 MB, RESOURCE DB ~22 MB; top object ช่วงนั้น = `xml_index_nodes_...` ~68 MB ตามด้วย `Person` ~32 MB, `SalesOrderDetail` ~19 MB; PLE node 000 = ~13,273 วินาที (1 NUMA node / 4 vCPU) — *(ก่อนมี Step 1 อุ่น buffer; รอ sign-off รอบถัดไปเพื่อจับตัวเลขหลังอุ่น buffer และค่าเทียบ Buffer Manager ในชุดเดียวกัน)*
 
 ---
 
@@ -203,7 +230,7 @@ SELECT DATEDIFF(MILLISECOND, @t, SYSUTCDATETIME()) AS insert_10k_ms;
 
 ## Wrap-up: คำถามท้ายแล็บ
 
-1. PLE ต่อ NUMA node ของเครื่องคุณเท่าไร และควรใช้เกณฑ์แบบไหนตัดสิน memory pressure?
+1. Buffer Manager PLE กับ Buffer Node PLE ต่างกันอย่างไร และเพราะอะไรบนเครื่องหลาย NUMA จึงต้องใช้ฝั่ง Buffer Node ตัดสิน memory pressure? (Buffer Manager = ค่าเฉลี่ยรวม ปิดบัง node ที่เดือดรายตัวได้)
 2. Memory spill เกิดตอนไหน และ Memory Grant Feedback ช่วยได้อย่างไร?
 3. ถ้า `total_waiter_count > 0` ที่ resource semaphore บ่งบอกปัญหาอะไร และ wait type ที่เกี่ยวข้องคืออะไร? (`RESOURCE_SEMAPHORE`)
 
