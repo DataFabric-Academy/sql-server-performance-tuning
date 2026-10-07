@@ -1,12 +1,12 @@
 # Lab 2: DiskSpd Benchmark & I/O Latency Analysis (บทที่ 2)
 
 > **ที่มา**: ปรับปรุงจาก Microsoft 10987C **Lab02** (DiskSpd) + [Microsoft Learn — sys.dm_io_virtual_file_stats](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-io-virtual-file-stats-transact-sql) + [Glenn Berry — SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
-> รูปแบบ: **Instruction + Code block** — ทุก Step รันได้ทันที (DiskSpd bundled อยู่ที่ `Trainer_Docs/10987/Labfiles/Lab02/Diskspd-v2.0.15/amd64fre/diskspd.exe`)
+> รูปแบบ: **Instruction + Code block** — ทุก Step รันได้ทันที (DiskSpd **v2.3** bundled อยู่ที่ `Labs/Tools/diskspd.exe` — เครื่อง ARM64 ใช้ `diskspd-arm64.exe`; รายละเอียด/SHA256 ที่ [`Labs/Tools/README.md`](Tools/README.md))
 
 ## Prerequisites
 
 - SQL Server 2019+ (แนะนำ **2025 (17.x)**), database **AdventureWorks2025**
-- **DiskSpd.exe** (ดาวน์โหลดจาก [github.com/microsoft/diskspd](https://github.com/microsoft/diskspd) หรือใช้ตัวใน 10987 Lab02)
+- **DiskSpd.exe** — bundled แล้วในโมดูลที่ `Labs/Tools/` (v2.3 จาก [github.com/microsoft/diskspd](https://github.com/microsoft/diskspd) release v2.3) หรือดาวน์โหลดเองได้จากลิงก์เดียวกัน; แนวทางใช้งานฉบับเต็ม (แปลจาก whitepaper ของ Microsoft + ภาคผนวก v2.3) ดู [`Labs/Tools/UsingDiskspdforSQLServer.md`](Tools/UsingDiskspdforSQLServer.md) — ต้นฉบับ .docx อยู่ในโฟลเดอร์เดียวกัน
 - Command Prompt / PowerShell แบบ Administrator
 - Permission: `VIEW SERVER STATE`, `sysadmin` (สำหรับ `DBCC DROPCLEANBUFFERS`)
 
@@ -192,7 +192,8 @@ del D:\Temp\sqltest.dat
 
 ## แหล่งอ้างอิง
 
-- 10987C Lab02 — `Trainer_Docs/10987/Labfiles/Lab02/`
+- 10987C Lab02 (ต้นฉบับแล็บจากชุด Microsoft 10987C — เวอร์ชัน DiskSpd เดิม 2.0.15, ปรับมาใช้ v2.3)
+- DiskSpd v2.3 — [github.com/microsoft/diskspd release v2.3](https://github.com/microsoft/diskspd/releases/tag/v2.3) (bundled ที่ [`Labs/Tools/`](Tools/README.md)) · Whitepaper: [`UsingDiskspdforSQLServer.docx`](Tools/UsingDiskspdforSQLServer.docx)
 - Microsoft Learn: [sys.dm_io_virtual_file_stats](https://learn.microsoft.com/sql/relational-databases/system-dynamic-management-views/sys-dm-io-virtual-file-stats-transact-sql) · [ZSTD backup compression (2025)](https://learn.microsoft.com/sql/relational-databases/backup-restore/backup-compression-sql-server)
 - Glenn Berry: [SQL Server 2025 Diagnostic Queries](https://glennsqlperformance.com/resources/)
 - สคริปต์ของแล็บนี้อยู่ใน `Sections/*/Scripts/` ของโมดูล จัดตามหัวข้อที่เกี่ยวข้อง (ลิงก์ในแต่ละ Exercise)

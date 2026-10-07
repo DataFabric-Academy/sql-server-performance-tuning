@@ -95,3 +95,10 @@ docs/_build/
 !Trainer_Docs/build_decks.py
 !Trainer_Docs/_template_work.pptx
 ~$*
+
+# ============================================
+# Bundled lab tool: DiskSpd v2.3 + Microsoft whitepaper (Module 02 lab)
+# Re-include over the global *.exe / *.docx rules — see Labs/Tools/README.md
+# ============================================
+!Module_02_IO/Labs/Tools/
+!Module_02_IO/Labs/Tools/**

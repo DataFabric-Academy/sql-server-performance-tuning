@@ -252,7 +252,7 @@ FROM sys.database_files;
 
 ### 6.2 การเตรียม + คำสั่ง 3 สถานการณ์
 
-DiskSpd ใช้ได้จาก [github.com/microsoft/diskspd](https://github.com/microsoft/diskspd) (หรือตัวที่แนบมากับ 10987 Lab02: `Trainer_Docs/10987/Labfiles/Lab02/Diskspd-v2.0.15/amd64fre/diskspd.exe`) — หลักการ: สร้างไฟล์ทดสอบก่อน (`-c`) เพื่อไม่ให้เวลาสร้างไฟล์ปนมาในผลวัด แล้วรันตาม pattern ของงานจริง:
+DiskSpd ใช้ได้จาก [github.com/microsoft/diskspd](https://github.com/microsoft/diskspd) (หรือ bundled ในโมดูลนี้: `Module_02_IO/Labs/Tools/diskspd.exe` — v2.3, เครื่อง ARM64 ใช้ `diskspd-arm64.exe`) — หลักการ: สร้างไฟล์ทดสอบก่อน (`-c`) เพื่อไม่ให้เวลาสร้างไฟล์ปนมาในผลวัด แล้วรันตาม pattern ของงานจริง:
 
 ```bat
 :: [0] เตรียมไฟล์ทดสอบ 2 GB (ไฟล์ว่างที่ถูก pre-allocate)

@@ -58,7 +58,7 @@
 
 
 ### 8.1 เครื่องมือทดสอบ I/O
-- **SQLIO ถูกยกเลิกแล้วทั้งหมด** — ใช้ **DiskSpd** (microsoft/diskspd) เป็นเครื่องมือมาตรฐานเดียว สอดคล้องกับ Lab ของ 10987C ที่แนบ DiskSpd 2.0.15 มาให้พร้อมใช้
+- **SQLIO ถูกยกเลิกแล้วทั้งหมด** — ใช้ **DiskSpd** (microsoft/diskspd) เป็นเครื่องมือมาตรฐานเดียว สอดคล้องกับ Lab ของ 10987C (DiskSpd **v2.3** bundled ที่ [`Labs/Tools/`](Labs/Tools/README.md) พร้อม whitepaper UsingDiskspdforSQLServer.docx)
 - ทางเลือกเสริมยุคใหม่: VM Fleet / storage benchmark ของ hardware vendor แต่หลักการตีความผล (IOPS vs Throughput vs Latency) เหมือนเดิม
 
 ### 8.2 ฟีเจอร์ใหม่ที่กระทบ I/O Profile

@@ -151,7 +151,7 @@
    GO
    ```
 3. เครื่องมือเสริม:
-   - **DiskSpd** — <https://github.com/microsoft/diskspd> (มี bundled ใน `Trainer_Docs/10987/Labfiles/Lab02/Diskspd-v2.0.15/`)
+   - **DiskSpd** — <https://github.com/microsoft/diskspd> (bundled v2.3 ใน `Module_02_IO/Labs/Tools/`)
    - **ostress** (RML Utilities) สำหรับ replay workload
 4. Permission สำหรับผู้เรียน: `VIEW SERVER STATE`, `VIEW DATABASE STATE` (หรือบทบาท `##MS_ServerPerformanceStateReader##` ที่มาใหม่ใน SQL Server 2022+)
 5. ทดสอบความพร้อม: รัน Query แรกในแต่ละ Lab แล้วเทียบบล็อก **Expected:** ท้ายแต่ละ Exercise — ทุก Exercise มีเกณฑ์ผ่านจากการรันจริงบน SQL Server 2025 (17.x) พร้อมระบุ build/วันที่ที่ sign-off
