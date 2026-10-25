@@ -100,6 +100,8 @@ ORDER BY AVG(rs.avg_duration) DESC;
 
 Task Manager โชว์ CPU 90%+ ฝ่าย Infra ทวงให้ scale-up ทันที แต่คุณ (จาก Module 1) รู้ว่า **CPU สูงไม่ได้แปลว่า CPU คือคอขวด** — signal wait อาจต่ำ (CPU ว่างพอ) และ top wait อาจชี้ไปที่ I/O หรือ client
 
+> ⚠️ **ห้ามใช้ "Analyze Wait Chain" ของ Task Manager / Resource Monitor กับ `sqlservr.exe`** — Microsoft ระบุชัดว่าฟีเจอร์นี้ **ไม่รองรับ** กระบวนการของ SQL Server และอาจทำให้เกิด runtime exception หรือ process dump ให้ใช้ DMV (`sys.dm_os_waiting_tasks`, `sys.dm_exec_requests`) ตามที่เรียนในโมดูลนี้แทน ([ที่มา: Performance Monitoring and Tuning Tools — Microsoft Learn](https://learn.microsoft.com/sql/relational-databases/performance/performance-monitoring-and-tuning-tools?view=sql-server-ver17))
+
 ### วินิจฉัย
 
 ขั้น 1: ดู CPU ย้อนหลังจาก ring buffer — ไม่ต้องติดตั้งอะไร:
@@ -428,6 +430,15 @@ SELECT @t1 - @t0 AS writelog_ms_added,
 4. ถ้า force plan แก้เคสได้ทันที เหตุใดจึงถือว่าเป็นเพียง mitigate และควรทำอะไรต่อ?
 5. เดโม WRITELOG ทำไมจึงต้องใช้ autocommit ทีละคำสั่ง แทนการครอบด้วย BEGIN TRAN เดียว?
 6. บน AdventureWorks ที่เปิด RCSI เหตุใดจึงยังเจอ blocking ได้ และมาจาก lock ชนิดใด?
+
+### ต่อยอดหลังคอร์ส — เครื่องมือและชุมชน
+
+ทุกเทคนิคในโมดูลนี้ query DMV ด้วยมือเพื่อให้เข้าใจกลไก — ในงานจริง ทีมงานใช้เครื่องมือชุมชนที่ทำงานเดียวกันให้เร็วขึ้น (คู่มือภาษาไทยรวมอยู่ที่ [Advanced_Scripts](../../../Advanced_Scripts/README.md)):
+
+- **PSBlitz** — รันครั้งเดียวได้รายงาน HTML/Excel ครบทั้ง wait stats, top queries, deadlock 15 วัน โดยไม่ต้องติดตั้งอะไรบนเซิร์ฟเวอร์เป้าหมาย → เหมาะเป็น **triage รอบแรก** ของ workflow ใน Section 11.1 ([GitHub: VladDBA/PSBlitz](https://github.com/VladDBA/PSBlitz))
+- **First Responder Kit** — `sp_Blitz` (ตรวจสุขภาพครั้งแรกที่เจอเซิร์ฟเวอร์), `sp_BlitzFirst` (ตอบ "ตอนนี้รออะไร"), `sp_BlitzCache`/`sp_BlitzIndex` (จูนเชิงลึก) ([FirstResponderKit.org](https://www.firstresponderkit.org/))
+- **Glenn Berry Diagnostic Queries** — สแนปช็อตเชิงลึกรายวัน อัปเดตรายเดือน มีรุ่น SQL Server 2025 ([glennsqlperformance.com/resources](https://glennsqlperformance.com/resources/))
+- **แหล่งเรียนรู้/ถามตอบ**: [Brent Ozar: SQL Server Performance Tuning](https://www.brentozar.com/sql/sql-server-performance-tuning/) (แนวคิด 4 ขั้น: Measure → Optimize Queries → Tune Indexes → Tune Server Settings) และ [r/SQLServer บน Reddit](https://www.reddit.com/r/SQLServer/) (ชุมชนแลกเปลี่ยนเคสจริง อัปเดตเครื่องมือใหม่ และรายเดือน "What are you working on?")
 
 **➡ ก่อนหน้า:** [Section 11.1 — Troubleshooting Workflow](../01_Troubleshooting_Workflow/README.md) | **ทบทวนรวม:** [Quiz Bank บทที่ 11](../../Quiz_Bank.md)
 

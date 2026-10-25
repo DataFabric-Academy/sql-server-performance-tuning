@@ -27,7 +27,7 @@
 - ✅ **Modern Scripts** อัปเดตตาม SQL Server 2025 — Optimized Locking, IQP รุ่นใหม่ (OPPO, CE Feedback), Query Store ล่าสุด, TempDB ADR/Governance
 - ✅ **Hands-on Labs** รูปแบบ *Instruction + Code block* — ทุก Step รันได้ทันทีจากเอกสารเดียว
 - ✅ **Workload Scripts** สำหรับทดสอบและสาธิต
-- ✅ **Best Practices** จาก Microsoft Learn, Course 10987C และ Glenn Berry Diagnostic Queries (SQL Server 2025)
+- ✅ **Best Practices** จาก Microsoft Learn (Performance Hub), Course 10987C, Glenn Berry Diagnostic Queries (SQL Server 2025) และเครื่องมือชุมชน — First Responder Kit, PSBlitz
 
 ---
 
@@ -134,6 +134,7 @@ Module_XX_Topic/
 - **Workload Scripts** (`Workload_*.sql`): สร้างโหลดจำลอง (CPU / I/O / Blocking) เพื่อให้แล็บเห็นปัญหาจริง
 - **Diagnostic Scripts**: สคริปต์วิเคราะห์เชิงลึก (หลายไฟล์อ้างอิง Glenn Berry Diagnostic Queries)
 - คู่มือแล็บรวมต่อโมดูล: `Labs/README.md` แบบ Instruction + Code block
+- **เครื่องมือระดับมืออาชีพ**: คู่มือภาษาไทยของ Glenn Berry Diagnostics, First Responder Kit, PSBlitz และ Tiger Toolbox รวมอยู่ที่ [Advanced_Scripts/README.md](Advanced_Scripts/README.md)
 
 - **Hands-on Exercises**: ฝึกปฏิบัติตามสถานการณ์จริง
 - **Challenge Scripts**: ทดสอบความเข้าใจด้วยปัญหาที่ซับซ้อน
@@ -155,9 +156,12 @@ Module_XX_Topic/
 - **Microsoft Course 10987C**: Performance Tuning and Optimizing SQL Server
 
 ### Additional Resources
-- **[Glenn Berry](https://glennsqlperformance.com/)**: SQL Server Diagnostic Information Queries (2025)
+- **[Glenn Berry](https://glennsqlperformance.com/)**: SQL Server Diagnostic Information Queries — อัปเดตรายเดือน มีรุ่นสำหรับ SQL Server 2025
+- **[Brent Ozar — First Responder Kit](https://www.firstresponderkit.org/)**: ชุด sp_Blitz* เครื่องมือวินิจฉัย open source ที่วงการใช้แพร่หลายที่สุด
+- **[PSBlitz (VladDBA)](https://github.com/VladDBA/PSBlitz)**: วินิจฉัยแบบรายงานเดียวจบ (HTML/Excel) โดยไม่ต้องติดตั้งอะไรบนเซิร์ฟเวอร์เป้าหมาย
 - **[SQLSkills](https://www.sqlskills.com/)**: Wait Statistics Library
-- **[Microsoft Learn](https://learn.microsoft.com/sql/)**: Performance Center Documentation
+- **[Microsoft Learn](https://learn.microsoft.com/sql/)**: [Monitor and Tune for Performance](https://learn.microsoft.com/sql/relational-databases/performance/monitor-and-tune-for-performance?view=sql-server-ver17) — Performance Hub ทางการ
+- **[r/SQLServer](https://www.reddit.com/r/SQLServer/)**: ชุมชนแลกเปลี่ยนเคสจริง เครื่องมือใหม่ และประสบการณ์หน้างาน
 
 ### License
 This repository is for educational purposes. Scripts are provided as-is with attribution to original authors.

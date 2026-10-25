@@ -16,21 +16,35 @@
 
 ## วิธีการเลือกใช้งาน (Version Compatibility)
 
-คุณต้องเลือกดาวน์โหลดไฟล์ **.sql** ให้ตรงกับเวอร์ชันของ SQL Server ที่คุณใช้งานอยู่:
+คุณต้องเลือกดาวน์โหลดไฟล์ **.sql** ให้ตรงกับเวอร์ชันของ SQL Server ที่คุณใช้งานอยู่ (ทุกรุ่นแนบ **spreadsheet ผลรัน .xlsx** ไว้ให้เทียบค่า baseline ได้ทันที):
 
-### 1. SQL Server 2022
-*   **เหมาะสำหรับ**: SQL Server 2022 (RTM หรือ Cumultative Update ล่าสุด)
-*   **Link**: [SQL Server 2022 Diagnostic Scripts](https://glennsqlperformance.com/resources/) (มองหาหัวข้อ SQL Server 2022)
+### 1. SQL Server 2025 ⭐ (ใช้ในคอร์สนี้)
+*   **เหมาะสำหรับ**: SQL Server 2025 (GA พฤศจิกายน 2025) — มีสคริปต์เฉพาะรุ่นแล้ว
+*   **Link**: [SQL Server 2025 Diagnostic Scripts](https://glennsqlperformance.com/resources/) (มองหาหัวข้อ SQL Server 2025)
 
-### 2. SQL Server 2019
+### 2. SQL Server 2022
+*   **เหมาะสำหรับ**: SQL Server 2022 (RTM หรือ Cumulative Update ล่าสุด — เช่น CU23 จากมกราคม 2026 ตามที่ Glenn ติดตามในบล็อก)
+*   **Link**: [SQL Server 2022 Diagnostic Scripts](https://glennsqlperformance.com/resources/)
+
+### 3. SQL Server 2019
 *   **เหมาะสำหรับ**: SQL Server 2019
 *   **Link**: [SQL Server 2019 Diagnostic Scripts](https://glennsqlperformance.com/resources/)
 
-### 3. SQL Server 2016 / 2017
-*   มีแยกไฟล์เฉพาะสำหรับแต่ละเวอร์ชันเช่นกัน
+### 4. SQL Server 2016 / 2017 (Legacy)
+*   มีแยกไฟล์เฉพาะสำหรับแต่ละเวอร์ชัน (2017, 2016 SP2, 2016 SP1) — กรณีดูแลระบบเก่าที่ยังไม่ย้ายขึ้น
 
-### 4. Azure SQL Database
-*   สำหรับ Azure SQL DB จะมีสคริปต์แยกต่างหาก เนื่องจากบาง DMV ไม่สามารถเข้าถึงได้เหมือน On-Premise
+### 5. Azure SQL Database / Managed Instance
+*   มีสคริปต์แยกต่างหากทั้งสองแบบ เนื่องจากบาง DMV ไม่สามารถเข้าถึงได้เหมือน On-Premise
+
+> **Note**: นอกจากไฟล์ .sql แล้ว ยังมี **Jupyter Notebooks (.ipynb)** สำหรับบางรุ่นที่จัดรูปแบบผลลัพธ์และเพิ่มคำอธิบายเพิ่มจากเวอร์ชันปกติ
+
+---
+
+## อัปเดตล่าสุด (Stay Current)
+
+- **อัปเดตรายเดือน**: Glenn เผยแพร่เวอร์ชันปรับปรุงทุกเดือนในบล็อก ภายใต้ชื่อ *SQL Server Diagnostic Information Queries for <เดือน/ปี>* (เช่น [ฉบับมกราคม 2026](https://glennsqlperformance.com/2026/01/02/sql-server-diagnostic-information-queries-for-january-2026)) — สคริปต์ของ SQL Server 2025 ได้รับการเพิ่มเติม/แก้ไขต่อเนื่องตั้งแต่เปิดตัว
+- **ควรดาวน์โหลดใหม่ทุก 3–6 เดือน** เพราะสคริปต์ถูกแก้ให้ตรงกับ DMV ที่เปลี่ยนตาม Cumulative Update ใหม่
+- **วิดีโอสอนอ่านผล**: มีชุดวิดีโอ YouTube บนช่องของ Glenn อธิบายวิธีตีความผลลัพธ์ทีละ query (ค้นว่า "Glenn Berry Diagnostic Queries" บน YouTube)
 
 ---
 

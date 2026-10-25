@@ -394,7 +394,16 @@ DBCC SQLPERF(LOGSPACE);
 
 หลัก least privilege: บน SQL Server 2022+ ใช้บทบาทใหม่ `##MS_ServerPerformanceStateReader##` ให้สิทธิ์อ่าน DMV ด้าน performance ทั้ง server **โดยไม่ต้องเป็น sysadmin** — ผูกให้ account ที่ใช้เก็บ baseline ทุกตัว (ตรวจบทบาท server ทั้งหมดได้ใน M0/หัวข้อ Security ของแล็บ)
 
-### 7.4 แผนผังรวม — ระบบ baseline ที่จบสมบูรณ์
+### 7.4 เครื่องมือชุมชนพร้อมรายงาน — First Responder Kit และ PSBlitz
+
+นอกจาก Glenn Berry และ dbatools แล้ว มีอีกสองชุดที่ทีมงานจริงใช้แพร่หลาย:
+
+- **First Responder Kit** (Brent Ozar Unlimited) — ชุด stored procedures ที่วงการดาวน์โหลดมากที่สุด: `sp_BlitzFirst` ทำหน้าที่เดียวกับ delta wait ของเราแบบสำเร็จรูป (สุ่มวัด 5 วินาที ตอบ "ตอนนี้รออะไร"), `sp_BlitzCache`/`sp_BlitzIndex` จัดอันดับ query และ index พร้อมธงเตือน → คู่มือ [Advanced_Scripts/BrentOzar_FRK](../../../Advanced_Scripts/BrentOzar_FRK/FRK_Guide.md)
+- **PSBlitz** (VladDBA) — PowerShell ที่ฝังสคริปต์ชุด FRK + sp_QuickieStore ไว้แล้ว **รันครั้งเดียวได้รายงาน HTML/Excel** (wait stats, top queries + `.sqlplan`, deadlock 15 วัน + `.xdl`) โดยไม่ต้องติดตั้ง object ใดบนเซิร์ฟเวอร์เป้าหมาย → คู่มือ [Advanced_Scripts/PSBlitz](../../../Advanced_Scripts/PSBlitz/PSBlitz_Guide.md)
+
+เปรียบเทียบกับระบบของเรา: ระบบ snapshot 15 นาที (Lab 10) ตอบคำถาม **trend** ("แย่ลงกี่เท่าจากเมื่อวาน") ซึ่งเครื่องมือพร้อมรายงานเหล่านี้ไม่ได้เก็บไว้ให้ — แต่ตัวมันเก่งกว่าเราเรื่อง **ความลึกของรายงานครั้งเดียวจบ** ใช้คู่กันจึงครบทั้งสองคำถาม (อ่านหลักการเดียวกันจาก [Brent Ozar: SQL Server Performance Tuning](https://www.brentozar.com/sql/sql-server-performance-tuning/) และเอกสารทางการ [Establish a Performance Baseline — Microsoft Learn](https://learn.microsoft.com/sql/relational-databases/performance/establish-a-performance-baseline?view=sql-server-ver17))
+
+### 7.5 แผนผังรวม — ระบบ baseline ที่จบสมบูรณ์
 
 ```
 SQL Agent Job / Task Scheduler (ทุก 15 นาที)
@@ -420,7 +429,7 @@ procedure เก็บ snapshot  (wait stats + file I/O + PerfMon)   ← Section
 3. จุดตัด "ผิดปกติ" ใช้สองชั้นคู่กัน: absolute threshold (เริ่มได้ทันที) + baseline-relative (แม่นยำเมื่อข้อมูลสะสม 2–4 สัปดาห์)
 4. Benchmark คุมตัวแปร: warm-up ทิ้งผลแรก, เปลี่ยนสิ่งเดียว, เทียบด้วยเมตริกเสถียร (logical reads/CPU), วัดซ้ำหลายรอบ
 5. Daily Health Check 6 result sets คือ baseline ฉบับพก — ธงสำคัญ: restart ล่าสุด, `process_*_memory_low = 1`, runnable queue ค้าง, QS ปิด, **last_backup = NULL**
-6. เครื่องมือมาตรฐาน: Glenn Berry (สแนปช็อตเชิงลึกรายวัน), dbatools (automation), `##MS_ServerPerformanceStateReader##` (สิทธิ์ที่ถูกต้อง)
+6. เครื่องมือมาตรฐาน: Glenn Berry (สแนปช็อตเชิงลึกรายวัน), dbatools (automation), First Responder Kit/PSBlitz (รายงานครั้งเดียวจบ), `##MS_ServerPerformanceStateReader##` (สิทธิ์ที่ถูกต้อง)
 
 **ตรวจความเข้าใจ:**
 
